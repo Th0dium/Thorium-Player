@@ -27,6 +27,10 @@ class AudioService {
 
         await TrackPlayer.setupPlayer({
             autoHandleInterruptions: true,
+            minBuffer: 20, // Buffer at least 20s
+            maxBuffer: 50, // Buffer up to 50s
+            playBuffer: 2.5, // Start playing after buffering 2.5s
+            backBuffer: 2.5, // Keep 2.5s behind current position
         });
 
         await TrackPlayer.updateOptions({

@@ -15,26 +15,30 @@ import { spacing, typography, borderRadius } from '@/constants/theme';
 
 interface TrackListItemProps {
     track: Track;
-    index: number;
+    index?: number; // Made optional since not all screens provide it
     isPlaying?: boolean;
     isSelected?: boolean;
     showIndex?: boolean;
     showArtwork?: boolean;
-    onPress: (track: Track, index: number) => void;
-    onLongPress?: (track: Track, index: number) => void;
+    showSelection?: boolean; // Alias for selection mode
+    onPress: (track: Track, index?: number) => void;
+    onLongPress?: (track: Track, index?: number) => void;
     onMorePress?: (track: Track) => void;
+    onMenuPress?: (track: Track) => void; // Alias for onMorePress
 }
 
 const TrackListItem: React.FC<TrackListItemProps> = memo(({
     track,
-    index,
+    index = 0,
     isPlaying = false,
     isSelected = false,
     showIndex = false,
     showArtwork = true,
+    showSelection = false,
     onPress,
     onLongPress,
     onMorePress,
+    onMenuPress,
 }) => {
     const { colors } = useTheme();
 
@@ -47,8 +51,9 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
     }, [track, index, onLongPress]);
 
     const handleMorePress = useCallback(() => {
-        onMorePress?.(track);
-    }, [track, onMorePress]);
+        // Use onMenuPress if provided, otherwise onMorePress
+        (onMenuPress || onMorePress)?.(track);
+    }, [track, onMorePress, onMenuPress]);
 
     return (
         <TouchableOpacity

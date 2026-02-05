@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
-import FileSystemService from '@/services/FileSystemService';
+import { fileSystemService } from '@/services/FileSystemService';
 import FolderBrowser from '@/components/FolderBrowser';
 
 interface ScannerSetupScreenProps {
@@ -57,7 +57,7 @@ const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack 
             const folders: DetectedFolder[] = [];
             for (const path of commonPaths) {
                 try {
-                    const exists = await FileSystemService.exists(path);
+                    const exists = await fileSystemService.exists(path);
                     if (exists) {
                         folders.push({
                             path,

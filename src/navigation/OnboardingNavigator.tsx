@@ -1,5 +1,5 @@
 // Onboarding Navigator - Handles the initial setup flow
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -11,6 +11,7 @@ import {
     ScanProgressScreen,
 } from '@/screens/onboarding';
 import { colors } from '@/constants/theme';
+import songScannerService, { ScanProgress, ScanResults } from '@/services/SongScannerService';
 
 type OnboardingStep = 'welcome' | 'permission' | 'scanner' | 'ui' | 'config' | 'scanProgress';
 
@@ -46,6 +47,15 @@ const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({ onComplete })
         excludeNotifications?: boolean;
         minDuration?: number;
     } | null>(null);
+    const [scanProgress, setScanProgress] = useState<ScanProgress>({
+        totalFound: 0,
+        profiled: 0,
+        inProgress: false,
+        currentFile: '',
+        percentage: 0,
+    });
+    const [scanResults, setScanResults] = useState<ScanResults | null>(null);
+    const backgroundScanRef = useRef<Promise<ScanResults> | null>(null);
 
     const handleComplete = async () => {
         await setOnboardingComplete();
@@ -54,11 +64,40 @@ const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({ onComplete })
 
     const handleScannerNext = (settings: any) => {
         setScannerSettings(settings);
+        // Start background scan immediately
+        startBackgroundScan(settings);
         setCurrentStep('ui');
     };
 
+    const startBackgroundScan = (settings: any) => {
+        // Start scan in background - don't wait for it
+        backgroundScanRef.current = songScannerService.scanAndProfile(
+            settings.folderPaths,
+            {
+                excludeFolders: settings.excludeFolders,
+                excludeRingtones: settings.excludeRingtones,
+                excludeNotifications: settings.excludeNotifications,
+                minDuration: settings.minDuration,
+            },
+            {
+                onProgress: (progress: ScanProgress) => {
+                    setScanProgress(progress);
+                },
+                onComplete: (results: ScanResults) => {
+                    setScanResults(results);
+                    setScanProgress({ ...progress, inProgress: false });
+                },
+                onError: (error: Error) => {
+                    console.error('Background scan error:', error);
+                    setScanProgress(prev => ({ ...prev, inProgress: false }));
+                },
+            }
+        );
+    };
+
     const handleConfigNext = () => {
-        if (scannerSettings && scannerSettings.folderPaths.length > 0) {
+        // If scan is still running, show progress screen
+        if (scanProgress.inProgress) {
             setCurrentStep('scanProgress');
         } else {
             handleComplete();
@@ -106,18 +145,10 @@ const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({ onComplete })
                     />
                 );
             case 'scanProgress':
-                if (!scannerSettings) {
-                    return <WelcomeScreen onGetStarted={() => setCurrentStep('welcome')} />;
-                }
                 return (
                     <ScanProgressScreen
-                        folderPaths={scannerSettings.folderPaths}
-                        options={{
-                            excludeFolders: scannerSettings.excludeFolders,
-                            excludeRingtones: scannerSettings.excludeRingtones,
-                            excludeNotifications: scannerSettings.excludeNotifications,
-                            minDuration: scannerSettings.minDuration,
-                        }}
+                        progress={scanProgress}
+                        isBackgroundScan={true}
                         onComplete={handleScanComplete}
                     />
                 );

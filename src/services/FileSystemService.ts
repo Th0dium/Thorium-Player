@@ -107,6 +107,7 @@ class FileSystemService {
             // Add current folder to list if it contains audio files
             if (trackCount > 0 || subfolders.length > 0) {
                 folders.push({
+                    id: this.generateTrackId(path), // Use same hash function for folder ID
                     path,
                     name: this.getFolderName(path),
                     trackCount,

@@ -18,6 +18,10 @@ export const colors = {
     backgroundTertiary: '#252525',
     surface: '#1E1E1E',
     surfaceElevated: '#2A2A2A',
+    surfaceVariant: '#303030',
+
+    // Border colors
+    border: '#333333',
 
     // Text colors
     text: '#FFFFFF',
@@ -81,6 +85,23 @@ export const typography = {
         medium: '500' as const,
         semibold: '600' as const,
         bold: '700' as const,
+    },
+    // Typography styles
+    headingLarge: {
+        fontSize: 32,
+        fontWeight: '700' as const,
+    },
+    headingMedium: {
+        fontSize: 24,
+        fontWeight: '600' as const,
+    },
+    body: {
+        fontSize: 16,
+        fontWeight: '400' as const,
+    },
+    caption: {
+        fontSize: 12,
+        fontWeight: '400' as const,
     },
 };
 

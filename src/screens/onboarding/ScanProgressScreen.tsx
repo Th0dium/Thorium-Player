@@ -11,83 +11,45 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
-import songScannerService, { ScanProgress, ScanResults } from '@/services/SongScannerService';
+import { ScanProgress, ScanResults } from '@/services/SongScannerService';
 
 interface ScanProgressScreenProps {
-    folderPaths: string[];
-    options?: {
-        excludeFolders?: string[];
-        excludeRingtones?: boolean;
-        excludeNotifications?: boolean;
-        minDuration?: number;
-    };
+    progress: ScanProgress;
     onComplete: (results: ScanResults) => void;
+    isBackgroundScan?: boolean;
 }
 
 const ScanProgressScreen: React.FC<ScanProgressScreenProps> = ({
-    folderPaths,
-    options,
+    progress,
     onComplete,
+    isBackgroundScan = false,
 }) => {
-    const [progress, setProgress] = useState<ScanProgress>({
-        totalFound: 0,
-        profiled: 0,
-        inProgress: true,
-        currentFile: '',
-        percentage: 0,
-    });
-    const [status, setStatus] = useState('Initializing scan...');
+    const [status, setStatus] = useState(isBackgroundScan ? 'Scanning in background...' : 'Initializing scan...');
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        startScan();
-    }, []);
-
-    const startScan = async () => {
-        try {
-            setStatus('Starting music discovery...');
-            setProgress({
-                totalFound: 0,
-                profiled: 0,
-                inProgress: true,
-                currentFile: '',
-                percentage: 0,
-            });
-
-            const results = await songScannerService.scanAndProfile(
-                folderPaths,
-                options,
-                {
-                    onProgress: (prog: ScanProgress) => {
-                        setProgress(prog);
-                        if (prog.totalFound === 0) {
-                            setStatus('Scanning folders...');
-                        } else if (prog.profiled === 0) {
-                            setStatus(`Found ${prog.totalFound} files, starting profiling...`);
-                        } else {
-                            setStatus(
-                                `Profiled ${prog.profiled} of ${prog.totalFound} files`
-                            );
-                        }
-                    },
-                    onComplete: (res: ScanResults) => {
-                        setStatus(`Complete! Found ${res.newTracks.length} new and ${res.updatedTracks.length} existing tracks.`);
-                        setProgress({ ...progress, inProgress: false });
-                        setTimeout(() => onComplete(res), 1000);
-                    },
-                    onError: (err: Error) => {
-                        setError(err.message);
-                        setProgress({ ...progress, inProgress: false });
-                        setStatus('Scan failed');
-                    },
-                }
-            );
-        } catch (err) {
-            setError((err as Error).message);
-            setProgress({ ...progress, inProgress: false });
-            setStatus('Scan failed');
+        // Update status based on progress
+        if (progress.totalFound === 0) {
+            setStatus('Scanning folders...');
+        } else if (progress.profiled === 0) {
+            setStatus(`Found ${progress.totalFound} files, starting profiling...`);
+        } else {
+            setStatus(`Profiled ${progress.profiled} of ${progress.totalFound} files`);
         }
-    };
+
+        // Call onComplete when scan finishes
+        if (!progress.inProgress && progress.profiled > 0) {
+            setTimeout(() => {
+                onComplete({
+                    newTracks: [],
+                    updatedTracks: [],
+                    removedTracks: [],
+                    totalScanned: progress.profiled,
+                    durationMs: 0,
+                });
+            }, 500);
+        }
+    }, [progress, onComplete]);
 
     if (error) {
         return (
@@ -113,7 +75,7 @@ const ScanProgressScreen: React.FC<ScanProgressScreenProps> = ({
                 {/* Title */}
                 <Text style={styles.title}>Scanning Music Library</Text>
                 <Text style={styles.description}>
-                    Finding and profiling your music files...
+                    {isBackgroundScan ? 'Indexing your music in the background...' : 'Finding and profiling your music files...'}
                 </Text>
 
                 {/* Progress stats */}

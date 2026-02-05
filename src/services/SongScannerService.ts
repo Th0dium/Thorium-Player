@@ -4,7 +4,7 @@ import RNFS from 'react-native-fs';
 import TrackPlayer, { Track } from 'react-native-track-player';
 import { Track as AppTrack, SongMetadata } from '@/types';
 import { databaseService } from './DatabaseService';
-import FileSystemService from './FileSystemService';
+import { fileSystemService } from './FileSystemService';
 
 export interface ScanProgress {
     totalFound: number;
@@ -79,7 +79,7 @@ class SongScannerService {
             for (const folderPath of folderPaths) {
                 if (this.cancelRequested) break;
 
-                const scanResult = await FileSystemService.getInstance().scanDirectory(
+                const scanResult = await fileSystemService.scanDirectory(
                     folderPath,
                     true,
                     options.excludeFolders || []
@@ -174,48 +174,8 @@ class SongScannerService {
      */
     private async profileTrack(track: AppTrack): Promise<AppTrack> {
         try {
-            // Read file stats for fingerprint generation
-            const stats = await RNFS.stat(track.path || '');
-            const fileSize = stats.size;
-
-            // Generate fingerprint from filename, size, and duration
-            const fingerprint = this.generateFingerprint(
-                track.path || '',
-                fileSize,
-                track.duration || 0
-            );
-
-            // Get or create song metadata
-            let metadata = await databaseService.getSongMetadata(track.id);
-
-            if (!metadata) {
-                metadata = {
-                    trackId: track.id,
-                    lastKnownPath: track.path || '',
-                    relativePath: this.getRelativePath(track.path || ''),
-                    fingerprint,
-                    playCount: 0,
-                    skipCount: 0,
-                    rating: 0,
-                    userTags: [],
-                    playbackPosition: {
-                        positionMs: 0,
-                        lastPlayedAt: null,
-                    },
-                    volumeNormalization: 0,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                };
-
-                await databaseService.saveSongMetadata(metadata);
-            } else {
-                // Update path if it changed
-                metadata.lastKnownPath = track.path || '';
-                metadata.relativePath = this.getRelativePath(track.path || '');
-                metadata.fingerprint = fingerprint;
-                metadata.updatedAt = new Date();
-                await databaseService.saveSongMetadata(metadata);
-            }
+            // Get or create song metadata using the existing DatabaseService method
+            const metadata = await databaseService.getSongMetadata(track.path || '');
 
             // Try to get additional metadata from TrackPlayer if available
             try {
@@ -234,6 +194,11 @@ class SongScannerService {
                 ...track,
                 id: track.id,
                 playCount: metadata.playCount,
+                isFavorite: metadata.isFavorite,
+                bookmarkPosition: metadata.bookmarkPosition || undefined,
+                totalListenTime: metadata.totalListenTime,
+                skipCount: metadata.skipCount,
+                rating: metadata.rating || undefined,
                 bookmarks: [],
                 aiTags: [],
             };
@@ -284,7 +249,7 @@ class SongScannerService {
     /**
      * Check if scan is in progress
      */
-    isScanning(): boolean {
+    getIsScanning(): boolean {
         return this.isScanning;
     }
 
@@ -309,6 +274,4 @@ class SongScannerService {
     }
 }
 
-const songScannerService = SongScannerService.getInstance();
-export default songScannerService;
-export { SongScannerService };
+export default SongScannerService.getInstance();
