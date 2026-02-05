@@ -1,0 +1,63 @@
+Manuscript: Extended Song Profiling & Backup System
+I. Data Architecture: The "Shadow Profile"
+Standard Android MediaStore only provides basic info (Title, Artist). You must build a custom Local Database Schema to store the "Extra Info."
+
+1. The Song Profile Table (songs_metadata)
+Every time a song is scanned, create an entry here. Do not rely on the file's ID3 tags for dynamic data like play counts.
+
+file_path (Primary Key): The unique identifier for the song.
+
+play_count (Integer): Increments only when a song reaches the 90% completion mark.
+
+last_played_timestamp: The exact date/time the song was last opened.
+
+date_added_to_app: Different from the file's "date modified."
+
+is_favorite (Boolean): A quick toggle for the "Favorites" playlist.
+
+bookmark_position (Long): Stores the exact millisecond where the user left off (crucial for podcasts/long sets).
+
+2. The Playlist Mapping Table (playlist_entries)
+Instead of storing playlists as separate files (like .m3u), store them as a many-to-many relationship table.
+
+playlist_id | song_file_path | entry_order
+
+This allows a single song to belong to 100 playlists without duplicating the audio file.
+
+II. Implementation of the Backup Engine
+The goal is to create a single .mus (or .zip) file that can restore the entire app state on a brand-new phone.
+
+1. The Backup Package Structure
+When the user taps "Backup Now," the app should generate a ZIP container containing:
+
+database_export.db: A copy of your SQLite/Room database file.
+
+preferences.json: A serialized version of all SharedPreferences (Theme, Tab order, Equalizer settings).
+
+metadata.json: A file containing the Backup Date, App Version, and a checksum for security.
+
+2. The "Path Re-mapping" Logic (Critical)
+The biggest challenge is moving backups between phones where the Music folder path might change (e.g., from an SD card to internal storage).
+
+The Solution: Store relative paths. Instead of /storage/emulated/0/Music/Song.mp3, store [ROOT]/Music/Song.mp3.
+
+On Restore: The app should ask the user to "Locate your Music Folder." Once identified, the app automatically swaps [ROOT] with the new device's path.
+
+III. Logic for Stats & Attributes
+
+Feature	Logic Trigger	Storage Method
+Play Count	Triggered when CurrentPosition > (Duration * 0.9).	UPDATE songs_metadata SET play_count = play_count + 1 WHERE path = current_path
+Last Played	Triggered on onStartCommand of the Media Player.	Store System.currentTimeMillis() in the DB.
+A-B Repeat	User marks Start and End timestamps.	Store in a temporary_playback_state table.
+
+
+IV. Instructions for Your Developer Agent
+"Implement a Persistent Data System using Room Database.
+
+Extended Profiles: Create a table that tracks play_counts, last_played, and is_favorite for every file path.
+
+Play Count Logic: Add an OnCompletionListener to the player that increments the count only if the song played for more than 30 seconds or 90% of its length.
+
+Backup System: Build a service that exports the Room .db file and SharedPreferences into a single ZIP archive.
+
+Smart Restore: When importing a backup, implement a Path Resolver that detects if the file paths have changed (e.g., due to a new device) and offers a 'Bulk Update Path' tool to link the old metadata to the new file locations."

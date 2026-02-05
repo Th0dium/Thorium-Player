@@ -1,0 +1,9 @@
+
+> TempThorium@0.0.1 android
+> react-native run-android
+
+/bin/sh: 1: adb: not found
+info Launching emulator...
+error Failed to launch emulator. Reason: No emulators found as an output of `emulator -list-avds`.
+warn Please launch an emulator manually or connect a device. Otherwise app may fail to launch.
+info Installing the app...

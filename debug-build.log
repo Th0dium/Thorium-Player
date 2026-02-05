@@ -1,0 +1,4 @@
+🔨 Building Thorium Player Debug APK
+📦 Project: /mnt/c/Dev
+
+./scripts/build-debug-apk.sh: line 14: cd: /mnt/c/Dev/android/android: No such file or directory

@@ -1,0 +1,4 @@
+rootProject.name = 'TempThorium'
+apply from: file("${rootDir.parentFile}/node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesSettingsGradle(settings)
+include ':app'
+includeBuild("${rootDir.parentFile}/node_modules/@react-native/gradle-plugin")
