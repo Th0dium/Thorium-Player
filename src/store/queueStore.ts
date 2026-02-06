@@ -81,6 +81,27 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
             currentQueue: lastQueue || null,
             activeQueueIndex: activeIndex >= 0 ? activeIndex : -1,
         });
+
+        // Hydrate AudioService if we have a current queue
+        if (lastQueue && lastQueue.trackIds.length > 0) {
+            try {
+                // We need full track objects for the player
+                const allTracks = await databaseService.getAllTracks();
+                const trackMap = new Map(allTracks.map(t => [t.id, t]));
+                const queueTracks = lastQueue.trackIds
+                    .map(id => trackMap.get(id))
+                    .filter((t): t is Track => t !== undefined);
+
+                if (queueTracks.length > 0) {
+                    await audioService.setQueue(queueTracks);
+                    // Don't auto-play, just set up the queue
+                    // We also don't seek to the last position yet to avoid auto-start behavior
+                    // unless we want to restore exact state (which is usually good UX)
+                }
+            } catch (error) {
+                console.warn('[QueueStore] Failed to hydrate player queue on load:', error);
+            }
+        }
     },
 
     // Create a new queue and start playing

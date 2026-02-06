@@ -50,6 +50,10 @@ interface UISettings {
     autoScanOnStartup: boolean;
     showTrackNotification: boolean;
     gaplessPlayback: boolean;
+
+    // Navigation state persistence
+    librarySubScreen: string | null;
+    librarySubTitle: string;
 }
 
 interface SettingsStore extends UISettings {
@@ -69,6 +73,7 @@ interface SettingsStore extends UISettings {
     setAutoScanOnStartup: (value: boolean) => void;
     setShowTrackNotification: (value: boolean) => void;
     setGaplessPlayback: (value: boolean) => void;
+    setLibraryNavigation: (screen: string | null, title?: string) => void;
 
     // Bulk update
     updateSettings: (settings: Partial<UISettings>) => void;
@@ -87,6 +92,8 @@ const DEFAULT_SETTINGS: UISettings = {
     autoScanOnStartup: false,
     showTrackNotification: true,
     gaplessPlayback: true,
+    librarySubScreen: null,
+    librarySubTitle: '',
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -100,6 +107,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             const stored = await AsyncStorage.getItem(SETTINGS_STORAGE_KEY);
             if (stored) {
                 const parsed = JSON.parse(stored) as Partial<UISettings>;
+                // Don't persist sub-screens across app restarts by default if preferred, 
+                // but for session persistence it's fine.
                 set({ ...DEFAULT_SETTINGS, ...parsed, isLoaded: true });
             } else {
                 set({ isLoaded: true });
@@ -124,6 +133,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                 autoScanOnStartup: state.autoScanOnStartup,
                 showTrackNotification: state.showTrackNotification,
                 gaplessPlayback: state.gaplessPlayback,
+                librarySubScreen: state.librarySubScreen,
+                librarySubTitle: state.librarySubTitle,
             };
             await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
         } catch (error) {
@@ -174,6 +185,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
     setGaplessPlayback: (value) => {
         set({ gaplessPlayback: value });
+        get().saveSettings();
+    },
+
+    setLibraryNavigation: (screen, title = '') => {
+        set({ librarySubScreen: screen, librarySubTitle: title });
         get().saveSettings();
     },
 

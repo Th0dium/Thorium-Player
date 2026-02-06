@@ -180,8 +180,8 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         // Optimistically update the queue index for instant highlight
         useQueueStore.getState().updateCurrentIndex(realIndex);
         await skipToIndex(realIndex);
-        // Ensure playback starts (important for first play on startup)
-        usePlayerStore.getState().play();
+        // Ensure playback starts (important if player was paused or on first play)
+        await usePlayerStore.getState().play();
     }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks]);
 
     const renderQueueItem = useCallback(({ item, drag, getIndex, isActive: isDragging }: RenderItemParams<Track>) => {
@@ -368,6 +368,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     containerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 120 }}
+                    activationDistance={10}
                 />
             ) : (
                 <EmptyState

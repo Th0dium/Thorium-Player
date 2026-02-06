@@ -31,6 +31,7 @@ interface TrackListItemProps {
     onMorePress?: (track: Track) => void;
     onMenuPress?: (track: Track) => void; // Alias for onMorePress
     onRemove?: (track: Track, index?: number) => void; // For remove button
+    rightElement?: React.ReactNode;
 }
 
 const TrackListItem: React.FC<TrackListItemProps> = memo(({
@@ -50,6 +51,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
     onMorePress,
     onMenuPress,
     onRemove,
+    rightElement,
 }) => {
     const { colors } = useTheme();
 
@@ -151,8 +153,12 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                 </Text>
             </View>
 
-            {/* Selection Indicator, Remove Button, or More Button */}
-            {isSelected ? (
+            {/* Right Element, Selection Indicator, Remove Button, or More Button */}
+            {rightElement ? (
+                <View style={styles.rightElementContainer}>
+                    {rightElement}
+                </View>
+            ) : isSelected ? (
                 <View style={[styles.checkContainer, { backgroundColor: colors.primary }]}>
                     <Icon name="check" size={16} color="#FFF" />
                 </View>
@@ -184,7 +190,8 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
         prevProps.isPast === nextProps.isPast &&
         prevProps.index === nextProps.index &&
         prevProps.showDragHandle === nextProps.showDragHandle &&
-        prevProps.showRemoveButton === nextProps.showRemoveButton
+        prevProps.showRemoveButton === nextProps.showRemoveButton &&
+        prevProps.rightElement === nextProps.rightElement
     );
 });
 
@@ -275,6 +282,11 @@ const styles = StyleSheet.create({
     },
     moreButton: {
         padding: spacing.xs,
+    },
+    rightElementContainer: {
+        paddingLeft: spacing.sm,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
 });
 
