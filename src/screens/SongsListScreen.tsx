@@ -19,12 +19,15 @@ import EmptyState from '@/components/EmptyState';
 import { Track } from '@/types';
 import { spacing, typography } from '@/constants/theme';
 
-export type FilterType = 'all-songs' | 'favorites' | 'recently-added' | 'recently-played' | 'most-played' | 'not-played' | 'playlist';
+export type FilterType = 'all-songs' | 'favorites' | 'recently-added' | 'recently-played' | 'most-played' | 'not-played' | 'playlist' | 'album' | 'artist' | 'genre';
 
 interface SongsListScreenProps {
     filter: FilterType;
     title: string;
     playlistId?: string;
+    albumId?: string;
+    artistId?: string;
+    genreId?: string;
     searchQuery?: string;
     isSearchActive?: boolean;
     onBack?: () => void;
@@ -34,6 +37,9 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     filter,
     title,
     playlistId,
+    albumId,
+    artistId,
+    genreId,
     searchQuery = '',
     isSearchActive = false,
     onBack,
@@ -41,6 +47,9 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     const { colors } = useTheme();
     const tracks = useLibraryStore(state => state.tracks);
     const playlists = useLibraryStore(state => state.playlists);
+    const albums = useLibraryStore(state => state.albums);
+    const artists = useLibraryStore(state => state.artists);
+    const genres = useLibraryStore(state => state.genres);
     const currentTrackId = usePlayerStore(state => state.currentTrack?.id);
     const createQueue = useQueueStore(state => state.createQueue);
 
@@ -86,6 +95,36 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                 }
                 break;
             }
+            case 'album': {
+                const album = albums.find(a => a.id === albumId);
+                if (album) {
+                    const trackMap = new Map(tracks.map(t => [t.id, t]));
+                    result = album.trackIds
+                        .map(id => trackMap.get(id))
+                        .filter((t): t is Track => t !== undefined);
+                }
+                break;
+            }
+            case 'artist': {
+                const artist = artists.find(a => a.id === artistId);
+                if (artist) {
+                    const trackMap = new Map(tracks.map(t => [t.id, t]));
+                    result = artist.trackIds
+                        .map(id => trackMap.get(id))
+                        .filter((t): t is Track => t !== undefined);
+                }
+                break;
+            }
+            case 'genre': {
+                const genre = genres.find(g => g.id === genreId);
+                if (genre) {
+                    const trackMap = new Map(tracks.map(t => [t.id, t]));
+                    result = genre.trackIds
+                        .map(id => trackMap.get(id))
+                        .filter((t): t is Track => t !== undefined);
+                }
+                break;
+            }
             default:
                 result = [...tracks];
         }
@@ -101,7 +140,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         }
 
         return result;
-    }, [tracks, playlists, playlistId, filter, searchQuery, isSearchActive]);
+    }, [tracks, playlists, albums, artists, genres, playlistId, albumId, artistId, genreId, filter, searchQuery, isSearchActive]);
 
     const handleTrackPress = useCallback((track: Track, index: number) => {
         // Don't await - let it happen asynchronously for instant UI response
@@ -113,13 +152,16 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
             'most-played': 'custom',
             'not-played': 'custom',
             'playlist': 'playlist',
+            'album': 'album',
+            'artist': 'artist',
+            'genre': 'genre',
         };
         createQueue(filteredTracks, {
             type: sourceTypeMap[filter] as any,
             name: title,
-            id: playlistId,
+            id: playlistId || albumId || artistId || genreId,
         }, index);
-    }, [filteredTracks, createQueue, filter, title, playlistId]);
+    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId]);
 
     const renderItem = useCallback(({ item, index }: { item: Track; index: number }) => (
         <TrackListItem

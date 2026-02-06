@@ -1,5 +1,5 @@
 // Progress Bar Component - Seek bar with time display and animated thumb
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -29,9 +29,14 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48 }) 
     const { colors } = useTheme();
     const { position, duration } = useProgress(500);
     const seekTo = usePlayerStore(state => state.seekTo);
-    const progress = duration > 0 ? position / duration : 0;
     const thumbScale = useRef(new Animated.Value(1)).current;
     const isSeeking = useRef(false);
+    const seekProgress = useRef(0);
+    const [localPosition, setLocalPosition] = useState<number | null>(null);
+
+    // Use local position while seeking, real position otherwise
+    const displayPosition = isSeeking.current && localPosition !== null ? localPosition : position;
+    const progress = duration > 0 ? displayPosition / duration : 0;
 
     const expandThumb = useCallback(() => {
         Animated.spring(thumbScale, {
@@ -60,15 +65,20 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48 }) 
                     expandThumb();
                     const x = evt.nativeEvent.locationX;
                     const newProgress = Math.max(0, Math.min(1, x / width));
-                    seekTo(newProgress * duration);
+                    seekProgress.current = newProgress;
+                    setLocalPosition(newProgress * duration);
                 },
                 onPanResponderMove: (evt) => {
                     const x = evt.nativeEvent.locationX;
                     const newProgress = Math.max(0, Math.min(1, x / width));
-                    seekTo(newProgress * duration);
+                    seekProgress.current = newProgress;
+                    setLocalPosition(newProgress * duration);
                 },
                 onPanResponderRelease: () => {
+                    // Only seek on release to avoid audio stuttering
+                    seekTo(seekProgress.current * duration);
                     isSeeking.current = false;
+                    setLocalPosition(null);
                     shrinkThumb();
                 },
             }),
@@ -78,7 +88,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48 }) 
     return (
         <View style={styles.container}>
             <View style={styles.timeRow}>
-                <Text style={[styles.time, { color: colors.textSecondary }]}>{formatTime(position)}</Text>
+                <Text style={[styles.time, { color: colors.textSecondary }]}>{formatTime(displayPosition)}</Text>
                 <Text style={[styles.time, { color: colors.textSecondary }]}>{formatTime(duration)}</Text>
             </View>
 

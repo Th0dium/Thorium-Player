@@ -42,6 +42,7 @@ import AppMenu from '@/components/AppMenu';
 // Stores & Theme
 import { useSettingsStore, TabId, MAIN_TABS } from '@/store/settingsStore';
 import { usePlayerStore } from '@/store/playerStore';
+import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
@@ -58,7 +59,6 @@ const MasterLayout: React.FC = () => {
     const hasCurrentTrack = usePlayerStore(state => state.currentTrack !== null);
 
     const [activeTab, setActiveTab] = useState<TabId>('library');
-    const [isNowPlayingExpanded, setIsNowPlayingExpanded] = useState(false);
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -67,7 +67,6 @@ const MasterLayout: React.FC = () => {
     const [librarySubScreen, setLibrarySubScreen] = useState<string | null>(null);
     const [librarySubTitle, setLibrarySubTitle] = useState<string>('');
 
-    const nowPlayingAnim = useRef(new Animated.Value(0)).current;
     const contentFade = useRef(new Animated.Value(1)).current;
 
     // Use main tabs (Queue, Playing, Library)
@@ -85,10 +84,9 @@ const MasterLayout: React.FC = () => {
             setActiveTab(tabId);
             setSearchQuery('');
             setIsSearchVisible(false);
-            if (tabId !== 'library') {
-                setLibrarySubScreen(null);
-                setLibrarySubTitle('');
-            }
+            // Clear sub-screen when switching tabs
+            setLibrarySubScreen(null);
+            setLibrarySubTitle('');
             Animated.timing(contentFade, {
                 toValue: 1,
                 duration: 150,
@@ -109,28 +107,10 @@ const MasterLayout: React.FC = () => {
         setLibrarySubTitle('');
     }, []);
 
-    // Handle mini-player press - expand to full Now Playing
+    // Handle mini-player press - switch to Playing tab
     const handleMiniPlayerPress = useCallback(() => {
-        setIsNowPlayingExpanded(true);
-        nowPlayingAnim.setValue(0);
-        Animated.spring(nowPlayingAnim, {
-            toValue: 1,
-            useNativeDriver: true,
-            tension: 65,
-            friction: 11,
-        }).start();
-    }, [nowPlayingAnim]);
-
-    // Handle Now Playing collapse
-    const handleNowPlayingCollapse = useCallback(() => {
-        Animated.timing(nowPlayingAnim, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-        }).start(() => {
-            setIsNowPlayingExpanded(false);
-        });
-    }, [nowPlayingAnim]);
+        handleTabPress('nowPlaying');
+    }, [handleTabPress]);
 
     // Toggle search visibility with animation
     const handleSearchToggle = useCallback(() => {
@@ -143,9 +123,9 @@ const MasterLayout: React.FC = () => {
 
     // Render the active screen content
     const renderContent = () => {
-        // If Now Playing tab is selected
+        // If Now Playing tab is selected, show the full player
         if (activeTab === 'nowPlaying') {
-            return <NowPlayingScreen isExpanded={false} onCollapse={() => { }} />;
+            return <NowPlayingScreen />;
         }
 
         const screenProps = {
@@ -153,60 +133,110 @@ const MasterLayout: React.FC = () => {
             isSearchActive: isSearchVisible && searchQuery.length > 0,
         };
 
+        // Check if we're in a sub-screen (works from any tab)
+        if (librarySubScreen) {
+            // Handle category screens
+            const categoryFilters: Record<string, FilterType> = {
+                'all-songs': 'all-songs',
+                'favorites': 'favorites',
+                'recently-added': 'recently-added',
+                'recently-played': 'recently-played',
+                'most-played': 'most-played',
+                'not-played': 'not-played',
+            };
+
+            if (categoryFilters[librarySubScreen]) {
+                return (
+                    <SongsListScreen
+                        filter={categoryFilters[librarySubScreen]}
+                        title={librarySubTitle}
+                        searchQuery={searchQuery}
+                        isSearchActive={isSearchVisible && searchQuery.length > 0}
+                        onBack={handleLibraryBack}
+                    />
+                );
+            }
+
+            // Handle playlist screens
+            if (librarySubScreen.startsWith('playlist-')) {
+                return (
+                    <SongsListScreen
+                        filter="playlist"
+                        playlistId={librarySubScreen.replace('playlist-', '')}
+                        title={librarySubTitle}
+                        searchQuery={searchQuery}
+                        isSearchActive={isSearchVisible && searchQuery.length > 0}
+                        onBack={handleLibraryBack}
+                    />
+                );
+            }
+
+            // Handle album screens
+            if (librarySubScreen.startsWith('album-')) {
+                return (
+                    <SongsListScreen
+                        filter="album"
+                        albumId={librarySubScreen.replace('album-', '')}
+                        title={librarySubTitle}
+                        searchQuery={searchQuery}
+                        isSearchActive={isSearchVisible && searchQuery.length > 0}
+                        onBack={handleLibraryBack}
+                    />
+                );
+            }
+
+            // Handle artist screens
+            if (librarySubScreen.startsWith('artist-')) {
+                return (
+                    <SongsListScreen
+                        filter="artist"
+                        artistId={librarySubScreen.replace('artist-', '')}
+                        title={librarySubTitle}
+                        searchQuery={searchQuery}
+                        isSearchActive={isSearchVisible && searchQuery.length > 0}
+                        onBack={handleLibraryBack}
+                    />
+                );
+            }
+
+            // Handle genre screens
+            if (librarySubScreen.startsWith('genre-')) {
+                return (
+                    <SongsListScreen
+                        filter="genre"
+                        genreId={librarySubScreen.replace('genre-', '')}
+                        title={librarySubTitle}
+                        searchQuery={searchQuery}
+                        isSearchActive={isSearchVisible && searchQuery.length > 0}
+                        onBack={handleLibraryBack}
+                    />
+                );
+            }
+        }
+
         switch (activeTab) {
             case 'queue':
                 return <QueueScreen {...screenProps} />;
             case 'library':
-                // Check if we're in a sub-screen
-                if (librarySubScreen) {
-                    // Handle category screens
-                    const categoryFilters: Record<string, FilterType> = {
-                        'all-songs': 'all-songs',
-                        'favorites': 'favorites',
-                        'recently-added': 'recently-added',
-                        'recently-played': 'recently-played',
-                        'most-played': 'most-played',
-                        'not-played': 'not-played',
-                    };
-
-                    if (categoryFilters[librarySubScreen]) {
-                        return (
-                            <SongsListScreen
-                                filter={categoryFilters[librarySubScreen]}
-                                title={librarySubTitle}
-                                searchQuery={searchQuery}
-                                isSearchActive={isSearchVisible && searchQuery.length > 0}
-                                onBack={handleLibraryBack}
-                            />
-                        );
-                    }
-
-                    // Handle playlist screens
-                    if (librarySubScreen.startsWith('playlist-')) {
-                        return (
-                            <SongsListScreen
-                                filter="playlist"
-                                playlistId={librarySubScreen.replace('playlist-', '')}
-                                title={librarySubTitle}
-                                searchQuery={searchQuery}
-                                isSearchActive={isSearchVisible && searchQuery.length > 0}
-                                onBack={handleLibraryBack}
-                            />
-                        );
-                    }
-                }
-                // Show library menu
                 return <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />;
             case 'folders':
                 return <FoldersScreen {...screenProps} />;
             case 'albums':
-                return <AlbumsScreen {...screenProps} />;
+                return <AlbumsScreen {...screenProps} onAlbumPress={(album) => {
+                    handleLibraryNavigate(`album-${album.id}`, { title: album.name });
+                }} />;
             case 'artists':
-                return <ArtistsScreen {...screenProps} />;
+                return <ArtistsScreen {...screenProps} onArtistPress={(artist) => {
+                    handleLibraryNavigate(`artist-${artist.id}`, { title: artist.name });
+                }} />;
             case 'playlists':
-                return <PlaylistsScreen {...screenProps} />;
+                return <PlaylistsScreen {...screenProps} onPlaylistPress={(playlist) => {
+                    handleLibraryNavigate(`playlist-${playlist.id}`, { title: playlist.name });
+                }} />;
             case 'genres':
-                return <GenresScreen {...screenProps} />;
+                return <GenresScreen {...screenProps} onGenrePress={(genre) => {
+                    handleLibraryNavigate(`genre-${genre.id}`, { title: genre.name });
+                }} />;
             case 'songs':
                 return <SongsScreen {...screenProps} />;
             default:
@@ -214,14 +244,8 @@ const MasterLayout: React.FC = () => {
         }
     };
 
-    // Calculate mini-player visibility
+    // Calculate mini-player visibility - hide on Playing tab
     const showMiniPlayer = hasCurrentTrack && activeTab !== 'nowPlaying';
-
-    // Animated styles for full-screen Now Playing overlay
-    const nowPlayingTranslateY = nowPlayingAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [SCREEN_HEIGHT, 0],
-    });
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -324,27 +348,13 @@ const MasterLayout: React.FC = () => {
                 </View>
             )}
 
-            {/* Full-screen Now Playing Overlay */}
-            {isNowPlayingExpanded && (
-                <Animated.View
-                    style={[
-                        styles.nowPlayingOverlay,
-                        {
-                            transform: [{ translateY: nowPlayingTranslateY }],
-                        },
-                    ]}
-                >
-                    <NowPlayingScreen
-                        isExpanded={true}
-                        onCollapse={handleNowPlayingCollapse}
-                    />
-                </Animated.View>
-            )}
-
             {/* App Menu */}
             <AppMenu
                 visible={isMenuVisible}
                 onClose={() => setIsMenuVisible(false)}
+                onScan={() => {
+                    useLibraryStore.getState().scanForMusic();
+                }}
             />
         </View>
     );
@@ -410,14 +420,6 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-    },
-    nowPlayingOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 100,
     },
 });
 

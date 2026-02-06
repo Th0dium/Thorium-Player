@@ -22,7 +22,6 @@ import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
-import { useToast } from '@/components/Toast';
 import TrackListItem from '@/components/TrackListItem';
 import { Track, Queue } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
@@ -37,15 +36,13 @@ interface QueueScreenProps {
 
 const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchActive = false }) => {
     const { colors } = useTheme();
-    const { showToast } = useToast();
     const insets = useSafeAreaInsets();
-    
+
     const queues = useQueueStore(state => state.queues);
     const currentQueue = useQueueStore(state => state.currentQueue);
     const currentIndex = useQueueStore(state => state.currentIndex);
     const activeQueueIndex = useQueueStore(state => state.activeQueueIndex);
     const removeFromQueue = useQueueStore(state => state.removeFromQueue);
-    const clearQueue = useQueueStore(state => state.clearQueue);
     const switchQueue = useQueueStore(state => state.switchQueue);
     const moveInQueue = useQueueStore(state => state.moveInQueue);
     const skipToIndex = usePlayerStore(state => state.skipToIndex);
@@ -125,8 +122,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         }
 
         deleteQueueAction(queue.id);
-        showToast('Queue removed', 'info');
-    }, [queues, activeQueueIndex, showToast]);
+    }, [queues, activeQueueIndex]);
 
     // Remove all queues except the active one
     const handleRemoveAllOtherQueues = useCallback(() => {
@@ -147,7 +143,6 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                         queuesToRemove.forEach(({ queue }) => {
                             deleteQueueAction(queue.id);
                         });
-                        showToast(`Removed ${queuesToRemove.length} queue${queuesToRemove.length > 1 ? 's' : ''}`, 'info');
                     }
                 },
             ]
@@ -166,23 +161,43 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     }, [queues]);
 
     const handleDragEnd = useCallback(({ data, from, to }: { data: Track[]; from: number; to: number }) => {
-        if (from !== to) {
-            moveInQueue(from, to);
-        }
-    }, [moveInQueue]);
+        if (from === to) return;
+        // Don't allow drag reorder when search is active — indices don't match
+        if (isSearchActive && searchQuery) return;
+        moveInQueue(from, to);
+    }, [moveInQueue, isSearchActive, searchQuery]);
 
-    const handleTrackPress = useCallback((index: number) => {
+    const handleTrackPress = useCallback(async (filteredIndex: number) => {
+        // Map filtered index back to full queue index when search is active
+        let realIndex = filteredIndex;
+        if (isSearchActive && searchQuery) {
+            const track = filteredTracks[filteredIndex];
+            if (track) {
+                realIndex = queueTracks.findIndex(t => t.id === track.id);
+                if (realIndex === -1) realIndex = filteredIndex;
+            }
+        }
         // Optimistically update the queue index for instant highlight
-        useQueueStore.getState().updateCurrentIndex(index);
-        skipToIndex(index);
-    }, [skipToIndex]);
+        useQueueStore.getState().updateCurrentIndex(realIndex);
+        await skipToIndex(realIndex);
+        // Ensure playback starts (important for first play on startup)
+        usePlayerStore.getState().play();
+    }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks]);
 
     const renderQueueItem = useCallback(({ item, drag, getIndex, isActive: isDragging }: RenderItemParams<Track>) => {
-        const index = getIndex();
-        if (index === undefined) return null;
+        const filteredIndex = getIndex();
+        if (filteredIndex === undefined) return null;
 
-        const isPlaying = index === currentIndex;
-        const isPast = index < currentIndex;
+        // Map filtered index to real queue index for correct highlight and operations
+        let realIndex = filteredIndex;
+        if (isSearchActive && searchQuery) {
+            realIndex = queueTracks.findIndex(t => t.id === item.id);
+            if (realIndex === -1) realIndex = filteredIndex;
+        }
+
+        const isPlaying = realIndex === currentIndex;
+        const isPast = realIndex < currentIndex;
+        const isSearching = isSearchActive && !!searchQuery;
 
         return (
             <View style={isDragging ? {
@@ -198,20 +213,20 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
             } : undefined}>
                 <TrackListItem
                     track={item}
-                    index={index}
+                    index={realIndex}
                     isPlaying={isPlaying}
                     isPast={isPast}
                     showIndex={true}
                     showArtwork={true}
-                    showDragHandle={true}
+                    showDragHandle={!isSearching}
                     showRemoveButton={true}
-                    drag={drag}
-                    onPress={() => handleTrackPress(index)}
-                    onRemove={() => removeFromQueue(index)}
+                    drag={isSearching ? undefined : drag}
+                    onPress={() => handleTrackPress(filteredIndex)}
+                    onRemove={() => removeFromQueue(realIndex)}
                 />
             </View>
         );
-    }, [currentIndex, handleTrackPress, removeFromQueue]);
+    }, [currentIndex, handleTrackPress, removeFromQueue, isSearchActive, searchQuery, queueTracks]);
 
     // --- Render Queue Switcher Modal Item ---
     const renderQueueSwitcherItem = ({ item: queue, index }: { item: Queue, index: number }) => {
@@ -322,13 +337,6 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                             : 'No Queue'}
                     </Text>
                     <Icon name="chevron-down" size={20} color={colors.textSecondary} />
-                    <TouchableOpacity
-                        style={styles.closeQueueSwitcher}
-                        onPress={clearQueue}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <Icon name="close" size={20} color={colors.textSecondary} />
-                    </TouchableOpacity>
                 </TouchableOpacity>
             </View>
 
@@ -359,7 +367,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     onDragEnd={handleDragEnd}
                     containerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 120 }} 
+                    contentContainerStyle={{ paddingBottom: 120 }}
                 />
             ) : (
                 <EmptyState
@@ -389,10 +397,10 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 >
                     <View
                         style={[
-                            styles.bottomSheetModal, 
-                            { 
+                            styles.bottomSheetModal,
+                            {
                                 backgroundColor: colors.surfaceElevated,
-                                paddingBottom: insets.bottom + 20 
+                                paddingBottom: insets.bottom + 20
                             }
                         ]}
                         onStartShouldSetResponder={() => true}
@@ -452,7 +460,7 @@ const formatTotalDuration = (tracks: Track[]): string => {
     const hours = Math.floor(totalSeconds / 3600);
     const mins = Math.floor((totalSeconds % 3600) / 60);
     const secs = Math.floor(totalSeconds % 60);
-    
+
     if (hours > 0) {
         return `${hours}h ${mins}m`;
     }

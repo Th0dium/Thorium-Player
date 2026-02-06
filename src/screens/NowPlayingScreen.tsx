@@ -1,6 +1,6 @@
 // Now Playing Screen - Full-screen player with album art and controls
 // Musicolet-style: Dynamic background, power-user row, swipe-to-dismiss
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import {
     View,
     Text,
@@ -11,10 +11,12 @@ import {
     StatusBar,
     PanResponder,
     Animated,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import TrackPlayer from 'react-native-track-player';
 import { usePlayerStore } from '@/store/playerStore';
 import { useTheme } from '@/context/ThemeContext';
 import PlayerControls from '@/components/PlayerControls';
@@ -27,21 +29,16 @@ const SWIPE_THRESHOLD = 100;
 
 interface NowPlayingScreenProps {
     navigation?: any;
-    isExpanded?: boolean;
-    onCollapse?: () => void;
 }
 
 const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
     navigation,
-    isExpanded = true,
-    onCollapse
 }) => {
     const { colors } = useTheme();
     const currentTrack = usePlayerStore(s => s.currentTrack);
-    const volume = usePlayerStore(s => s.volume);
+    const toggleFavorite = usePlayerStore(s => s.toggleFavorite);
     const skipNext = usePlayerStore(s => s.skipNext);
     const skipPrevious = usePlayerStore(s => s.skipPrevious);
-    const panY = useRef(new Animated.Value(0)).current;
     const artworkScale = useRef(new Animated.Value(0.85)).current;
     const artworkOpacity = useRef(new Animated.Value(0)).current;
     const heartScale = useRef(new Animated.Value(1)).current;
@@ -86,8 +83,24 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                 bounciness: 8,
             }),
         ]).start();
-        // TODO: toggleFavorite()
-    }, [heartScale]);
+        toggleFavorite();
+    }, [heartScale, toggleFavorite]);
+
+    // Playback speed
+    const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+
+    const handleSpeedPress = useCallback(() => {
+        const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+        const buttons = speeds.map(s => ({
+            text: `${s}x${s === playbackSpeed ? ' ✓' : ''}`,
+            onPress: () => {
+                TrackPlayer.setRate(s);
+                setPlaybackSpeed(s);
+            },
+        }));
+        buttons.push({ text: 'Cancel', onPress: () => { } });
+        Alert.alert('Playback Speed', 'Select speed', buttons);
+    }, [playbackSpeed]);
 
     // Pan responder for swipe-down to dismiss
     const panResponder = useRef(
@@ -114,7 +127,7 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                         navigation.goBack();
                     }
                 }
-                
+
                 // Reset vertical position
                 Animated.spring(panY, {
                     toValue: 0,
@@ -144,13 +157,7 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
     }
 
     return (
-        <Animated.View
-            style={[
-                styles.container,
-                { transform: [{ translateY: panY }] },
-            ]}
-            {...panResponder.panHandlers}
-        >
+        <View style={styles.container}>
             <LinearGradient
                 colors={[colors.primaryDark, colors.background, colors.background]}
                 style={styles.gradient}
@@ -162,12 +169,9 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                         <View style={[styles.swipeIndicator, { backgroundColor: colors.textTertiary }]} />
 
                         <View style={styles.headerRow}>
-                            <TouchableOpacity
-                                onPress={handleClose}
-                                style={styles.headerButton}
-                            >
-                                <Icon name="chevron-down" size={28} color={colors.textPrimary} />
-                            </TouchableOpacity>
+                            <View style={styles.headerButton}>
+                                {/* Tab navigation handles back - no close button needed */}
+                            </View>
 
                             <View style={styles.headerCenter}>
                                 <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
@@ -225,7 +229,11 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                                 onPress={handleFavoritePress}
                             >
                                 <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-                                    <Icon name="heart-outline" size={24} color={colors.textPrimary} />
+                                    <Icon
+                                        name={currentTrack?.isFavorite ? 'heart' : 'heart-outline'}
+                                        size={24}
+                                        color={currentTrack?.isFavorite ? colors.primary : colors.textPrimary}
+                                    />
                                 </Animated.View>
                             </TouchableOpacity>
                         </View>
@@ -239,34 +247,36 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
 
                     {/* Power User Row (Musicolet-style) */}
                     <View style={styles.powerUserRow}>
-                        <TouchableOpacity style={styles.powerButton}>
+                        <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('Queue View', 'Switch to Queue tab to manage queue')}>
                             <Icon name="playlist-play" size={22} color={colors.textSecondary} />
                             <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Queue</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.powerButton}>
+                        <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('A-B Repeat', 'Coming soon')}>
                             <Icon name="repeat-variant" size={22} color={colors.textSecondary} />
                             <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>A-B</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.powerButton}>
-                            <Icon name="speedometer" size={22} color={colors.textSecondary} />
-                            <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Speed</Text>
+                        <TouchableOpacity style={styles.powerButton} onPress={handleSpeedPress}>
+                            <Icon name="speedometer" size={22} color={playbackSpeed !== 1.0 ? colors.primary : colors.textSecondary} />
+                            <Text style={[styles.powerButtonLabel, { color: playbackSpeed !== 1.0 ? colors.primary : colors.textSecondary }]}>
+                                {playbackSpeed !== 1.0 ? `${playbackSpeed}x` : 'Speed'}
+                            </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.powerButton}>
+                        <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('Sleep Timer', 'Coming soon')}>
                             <Icon name="timer-outline" size={22} color={colors.textSecondary} />
                             <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Timer</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.powerButton}>
+                        <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('Tag Editor', 'Coming soon')}>
                             <Icon name="tag-multiple" size={22} color={colors.textSecondary} />
                             <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Tags</Text>
                         </TouchableOpacity>
                     </View>
                 </SafeAreaView>
             </LinearGradient>
-        </Animated.View>
+        </View>
     );
 };
 

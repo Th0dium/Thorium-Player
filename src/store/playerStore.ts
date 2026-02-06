@@ -135,7 +135,16 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
     toggleShuffle: () => {
         const { shuffleMode } = get();
-        set({ shuffleMode: shuffleMode === 'off' ? 'on' : 'off' });
+        const newMode = shuffleMode === 'off' ? 'on' : 'off';
+        set({ shuffleMode: newMode });
+
+        // Actually shuffle/unshuffle the queue
+        const queueStore = require('./queueStore').useQueueStore.getState();
+        if (newMode === 'on') {
+            queueStore.shuffleQueue();
+        } else {
+            queueStore.unshuffleQueue();
+        }
     },
 
     // Extended features

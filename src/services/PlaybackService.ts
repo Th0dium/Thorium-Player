@@ -1,5 +1,5 @@
 // Playback Service - Background playback handler for react-native-track-player
-import TrackPlayer, { Event } from 'react-native-track-player';
+import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { useSettingsStore } from '@/store/settingsStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
@@ -99,8 +99,8 @@ module.exports = async function () {
     // Handle playback state changes - sync isPlaying to playerStore
     TrackPlayer.addEventListener(Event.PlaybackState, (event) => {
         try {
-            const isPlaying = event.state === 'playing';
-            const isPaused = event.state === 'paused' || event.state === 'stopped' || event.state === 'none';
+            const isPlaying = event.state === State.Playing;
+            const isPaused = event.state === State.Paused || event.state === State.Stopped || event.state === State.None;
             if (isPlaying) {
                 usePlayerStore.getState().setIsPlaying(true);
             } else if (isPaused) {

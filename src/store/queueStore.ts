@@ -4,6 +4,7 @@ import { Queue, Track, QueueSource } from '@/types';
 import { databaseService } from '@/services/DatabaseService';
 import { audioService } from '@/services/AudioService';
 import { usePlayerStore } from './playerStore';
+import { useLibraryStore } from './libraryStore';
 
 let nextQueueId = 1;
 
@@ -240,13 +241,13 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         // Add to audio player
         await audioService.addTracksToQueue(tracks, insertIndex);
 
-        // Update queue
+        // Update queue immutably
         const newTrackIds = [...currentQueue.trackIds];
         newTrackIds.splice(insertIndex, 0, ...tracks.map(t => t.id));
-        currentQueue.trackIds = newTrackIds;
+        const updatedQueue = { ...currentQueue, trackIds: newTrackIds };
 
-        await databaseService.saveQueue(currentQueue);
-        set({ currentQueue: { ...currentQueue } });
+        await databaseService.saveQueue(updatedQueue);
+        set({ currentQueue: updatedQueue });
     },
 
     // Alias - add to end of queue
@@ -267,15 +268,17 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         await audioService.removeFromQueue(index);
 
         const newTrackIds = currentQueue.trackIds.filter((_, i) => i !== index);
-        currentQueue.trackIds = newTrackIds;
 
         // Adjust current index if needed
+        let newCurrentIndex = currentQueue.currentIndex;
         if (index < currentQueue.currentIndex) {
-            currentQueue.currentIndex--;
+            newCurrentIndex--;
         }
 
-        await databaseService.saveQueue(currentQueue);
-        set({ currentQueue: { ...currentQueue } });
+        const updatedQueue = { ...currentQueue, trackIds: newTrackIds, currentIndex: newCurrentIndex };
+
+        await databaseService.saveQueue(updatedQueue);
+        set({ currentQueue: updatedQueue });
     },
 
     // Alias for removeFromCurrentQueue
@@ -291,19 +294,21 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const newTrackIds = [...currentQueue.trackIds];
         const [moved] = newTrackIds.splice(fromIndex, 1);
         newTrackIds.splice(toIndex, 0, moved);
-        currentQueue.trackIds = newTrackIds;
 
         // Update current index
+        let newCurrentIndex = currentQueue.currentIndex;
         if (fromIndex === currentQueue.currentIndex) {
-            currentQueue.currentIndex = toIndex;
+            newCurrentIndex = toIndex;
         } else if (fromIndex < currentQueue.currentIndex && toIndex >= currentQueue.currentIndex) {
-            currentQueue.currentIndex--;
+            newCurrentIndex--;
         } else if (fromIndex > currentQueue.currentIndex && toIndex <= currentQueue.currentIndex) {
-            currentQueue.currentIndex++;
+            newCurrentIndex++;
         }
 
-        await databaseService.saveQueue(currentQueue);
-        set({ currentQueue: { ...currentQueue } });
+        const updatedQueue = { ...currentQueue, trackIds: newTrackIds, currentIndex: newCurrentIndex };
+
+        await databaseService.saveQueue(updatedQueue);
+        set({ currentQueue: updatedQueue });
     },
 
     // Alias for moveInCurrentQueue
@@ -319,14 +324,12 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         // Find current track ID
         const currentTrackId = currentQueue.trackIds[currentQueue.currentIndex];
 
-        // Update track order
-        currentQueue.trackIds = newTrackIds;
+        // Update track order and maintain same playing track
+        const newCurrentIndex = newTrackIds.indexOf(currentTrackId);
+        const updatedQueue = { ...currentQueue, trackIds: newTrackIds, currentIndex: newCurrentIndex };
 
-        // Update current index to maintain same playing track
-        currentQueue.currentIndex = newTrackIds.indexOf(currentTrackId);
-
-        await databaseService.saveQueue(currentQueue);
-        set({ currentQueue: { ...currentQueue } });
+        await databaseService.saveQueue(updatedQueue);
+        set({ currentQueue: updatedQueue });
     },
 
     // Update current index - called when TrackPlayer changes track
@@ -334,14 +337,8 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const { currentQueue } = get();
         if (!currentQueue || index < 0 || index >= currentQueue.trackIds.length) return;
 
-        currentQueue.currentIndex = index;
-        set({ currentQueue: { ...currentQueue }, currentIndex: index });
-
-        // Update the track in playerStore
-        const allTracks = usePlayerStore.getState();
-        const trackId = currentQueue.trackIds[index];
-        // We'll need to find the track - use libraryStore since we have it imported indirectly
-        // The PlaybackService will handle setting the current track on playerStore
+        const updatedQueue = { ...currentQueue, currentIndex: index };
+        set({ currentQueue: updatedQueue, currentIndex: index });
     },
 
     // Shuffle queue
@@ -380,7 +377,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const actualIndex = shuffledOrder ? shuffledOrder[index] : index;
         await audioService.skipToTrack(actualIndex);
 
-        currentQueue.currentIndex = actualIndex;
+        const updatedQueue = { ...currentQueue, currentIndex: actualIndex };
         await databaseService.updateQueuePosition(currentQueue.id, actualIndex);
 
         const allTracks = await databaseService.getAllTracks();
@@ -389,7 +386,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
             usePlayerStore.getState().setCurrentTrack(track);
         }
 
-        set({ currentQueue: { ...currentQueue } });
+        set({ currentQueue: updatedQueue });
     },
 
     // Get current track index
@@ -414,8 +411,11 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         if (nextIdx >= currentQueue.trackIds.length) return null;
 
         const actualIdx = shuffledOrder ? shuffledOrder[nextIdx] : nextIdx;
-        // Would need to get track from database
-        return null;
+        const trackId = currentQueue.trackIds[actualIdx];
+        if (!trackId) return null;
+
+        const tracks = useLibraryStore.getState().tracks;
+        return tracks.find(t => t.id === trackId) || null;
     },
 
     // Get previous track
@@ -429,13 +429,23 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         if (prevIdx < 0) return null;
 
         const actualIdx = shuffledOrder ? shuffledOrder[prevIdx] : prevIdx;
-        return null;
+        const trackId = currentQueue.trackIds[actualIdx];
+        if (!trackId) return null;
+
+        const tracks = useLibraryStore.getState().tracks;
+        return tracks.find(t => t.id === trackId) || null;
     },
 
     // Get all tracks in current queue
     getQueueTracks: () => {
-        // Would need to be async to get from database
-        return [];
+        const { currentQueue } = get();
+        if (!currentQueue) return [];
+
+        const tracks = useLibraryStore.getState().tracks;
+        const trackMap = new Map(tracks.map(t => [t.id, t]));
+        return currentQueue.trackIds
+            .map(id => trackMap.get(id))
+            .filter((t): t is Track => t !== undefined);
     },
 }));
 
