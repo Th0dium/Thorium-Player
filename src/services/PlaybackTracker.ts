@@ -71,12 +71,14 @@ class PlaybackTracker {
      * Handle track change - save stats for previous track, reset for new track
      */
     private async handleTrackChange(event: { index?: number; track?: any }): Promise<void> {
-        // Save stats for the previous track before switching
+        // Fire-and-forget save for the previous track (don't block new track setup)
         if (this.trackingState.currentTrackPath) {
-            await this.saveCurrentTrackStats(true);
+            this.saveCurrentTrackStats(true).catch(e =>
+                console.warn('[PlaybackTracker] Failed to save stats for previous track:', e)
+            );
         }
 
-        // Reset tracking for new track
+        // Reset tracking for new track immediately
         if (event.track) {
             const trackPath = normalizePath(event.track.url || event.track.path);
 
@@ -89,9 +91,11 @@ class PlaybackTracker {
                 isPlaying: false,
             };
 
-            // Record that playback started (update lastPlayed timestamp immediately)
+            // Fire-and-forget lastPlayed update
             if (trackPath) {
-                await databaseService.updateLastPlayed(trackPath);
+                databaseService.updateLastPlayed(trackPath).catch(e =>
+                    console.warn('[PlaybackTracker] Failed to update lastPlayed:', e)
+                );
                 if (__DEV__) {
                     console.log('[PlaybackTracker] Now tracking:', event.track.title);
                 }
@@ -154,7 +158,7 @@ class PlaybackTracker {
     /**
      * Update progress and check for play count trigger
      */
-    private async updateProgress(progress: Progress): Promise<void> {
+    private updateProgress(progress: Progress): void {
         if (!this.trackingState.currentTrackPath || !this.trackingState.isPlaying) return;
 
         const now = Date.now();
@@ -179,7 +183,7 @@ class PlaybackTracker {
             const reachedMinTime = this.trackingState.totalListenedTime >= PLAY_COUNT_MIN_SECONDS;
 
             if (reachedPercentage || reachedMinTime) {
-                await this.incrementPlayCount();
+                this.incrementPlayCount();
             }
         }
     }
@@ -187,11 +191,14 @@ class PlaybackTracker {
     /**
      * Increment play count for current track
      */
-    private async incrementPlayCount(): Promise<void> {
+    private incrementPlayCount(): void {
         if (!this.trackingState.currentTrackPath || this.trackingState.hasCountedPlay) return;
 
         this.trackingState.hasCountedPlay = true;
-        await databaseService.incrementPlayCount(this.trackingState.currentTrackPath);
+        // Fire-and-forget
+        databaseService.incrementPlayCount(this.trackingState.currentTrackPath).catch(e =>
+            console.warn('[PlaybackTracker] Failed to increment play count:', e)
+        );
 
         if (__DEV__) {
             console.log('[PlaybackTracker] Play count incremented for:', this.trackingState.currentTrackPath);
@@ -221,13 +228,23 @@ class PlaybackTracker {
         if (!this.trackingState.currentTrackPath) return;
 
         const listenTime = this.trackingState.totalListenedTime;
+
+        // Parallelize independent DB writes
+        const promises: Promise<void>[] = [];
+
         if (listenTime > 0) {
-            await databaseService.addListenTime(this.trackingState.currentTrackPath, Math.floor(listenTime));
+            promises.push(
+                databaseService.addListenTime(this.trackingState.currentTrackPath, Math.floor(listenTime))
+            );
         }
 
         // Check if this was a skip
         if (isFinalSave && !this.trackingState.hasCountedPlay && listenTime >= 3) {
-            await this.recordSkip();
+            promises.push(this.recordSkip());
+        }
+
+        if (promises.length > 0) {
+            await Promise.all(promises);
         }
     }
 

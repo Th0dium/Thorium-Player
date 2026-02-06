@@ -175,9 +175,9 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const queue = await databaseService.getQueue(queueId);
         if (!queue) return;
 
-        // Get tracks for this queue
-        const allTracks = await databaseService.getAllTracks();
-        const trackMap = new Map(allTracks.map(t => [t.id, t]));
+        // Use library store's cached tracks instead of loading all from DB
+        const libraryTracks = useLibraryStore.getState().tracks;
+        const trackMap = new Map(libraryTracks.map(t => [t.id, t]));
         const queueTracks = queue.trackIds
             .map(id => trackMap.get(id))
             .filter((t): t is Track => t !== undefined);
@@ -190,16 +190,13 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         await audioService.setQueue(queueTracks);
         await audioService.skipToTrack(playIndex);
 
-        // Update state
+        // Update state optimistically
         queue.currentIndex = playIndex;
         queue.lastPlayed = Date.now();
-        await databaseService.saveQueue(queue);
-        await databaseService.setLastPlayedQueue(queueId);
 
         usePlayerStore.getState().setCurrentTrack(queueTracks[playIndex]);
         usePlayerStore.getState().setCurrentQueueId(queueId);
 
-        // Find the index of this queue in the queues array
         const queueIndex = get().queues.findIndex(q => q.id === queueId);
 
         set({
@@ -208,6 +205,10 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
             activeQueueIndex: queueIndex >= 0 ? queueIndex : get().activeQueueIndex,
             shuffledOrder: null,
         });
+
+        // Fire-and-forget persistence
+        databaseService.saveQueue(queue).catch(e => console.warn('[QueueStore] Failed to save queue:', e));
+        databaseService.setLastPlayedQueue(queueId).catch(e => console.warn('[QueueStore] Failed to set last played:', e));
 
         await audioService.play();
         usePlayerStore.getState().setIsPlaying(true);
@@ -285,13 +286,17 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         // Add to audio player
         await audioService.addTracksToQueue(tracks, insertIndex);
 
-        // Update queue immutably
+        // Update queue immutably (optimistic)
         const newTrackIds = [...currentQueue.trackIds];
         newTrackIds.splice(insertIndex, 0, ...tracks.map(t => t.id));
         const updatedQueue = { ...currentQueue, trackIds: newTrackIds };
 
-        await databaseService.saveQueue(updatedQueue);
         set({ currentQueue: updatedQueue });
+
+        // Fire-and-forget persistence
+        databaseService.saveQueue(updatedQueue).catch(e =>
+            console.warn('[QueueStore] Failed to save queue:', e)
+        );
     },
 
     // Alias - add to end of queue
@@ -321,8 +326,13 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
         const updatedQueue = { ...currentQueue, trackIds: newTrackIds, currentIndex: newCurrentIndex };
 
-        await databaseService.saveQueue(updatedQueue);
+        // Optimistic update
         set({ currentQueue: updatedQueue });
+
+        // Fire-and-forget persistence
+        databaseService.saveQueue(updatedQueue).catch(e =>
+            console.warn('[QueueStore] Failed to save queue:', e)
+        );
     },
 
     // Alias for removeFromCurrentQueue
@@ -351,8 +361,13 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
         const updatedQueue = { ...currentQueue, trackIds: newTrackIds, currentIndex: newCurrentIndex };
 
-        await databaseService.saveQueue(updatedQueue);
+        // Optimistic update
         set({ currentQueue: updatedQueue });
+
+        // Fire-and-forget persistence
+        databaseService.saveQueue(updatedQueue).catch(e =>
+            console.warn('[QueueStore] Failed to save queue:', e)
+        );
     },
 
     // Alias for moveInCurrentQueue
@@ -372,8 +387,13 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const newCurrentIndex = newTrackIds.indexOf(currentTrackId);
         const updatedQueue = { ...currentQueue, trackIds: newTrackIds, currentIndex: newCurrentIndex };
 
-        await databaseService.saveQueue(updatedQueue);
+        // Optimistic update
         set({ currentQueue: updatedQueue });
+
+        // Fire-and-forget persistence
+        databaseService.saveQueue(updatedQueue).catch(e =>
+            console.warn('[QueueStore] Failed to save queue:', e)
+        );
     },
 
     // Update current index - called when TrackPlayer changes track
@@ -427,15 +447,21 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         await audioService.skipToTrack(actualIndex);
 
         const updatedQueue = { ...currentQueue, currentIndex: actualIndex };
-        await databaseService.updateQueuePosition(currentQueue.id, actualIndex);
 
-        const allTracks = await databaseService.getAllTracks();
-        const track = allTracks.find(t => t.id === currentQueue.trackIds[actualIndex]);
+        // Use library store's cached tracks instead of loading all from DB
+        const libraryTracks = useLibraryStore.getState().tracks;
+        const trackId = currentQueue.trackIds[actualIndex];
+        const track = libraryTracks.find(t => t.id === trackId);
         if (track) {
             usePlayerStore.getState().setCurrentTrack(track);
         }
 
         set({ currentQueue: updatedQueue });
+
+        // Fire-and-forget persistence
+        databaseService.updateQueuePosition(currentQueue.id, actualIndex).catch(e =>
+            console.warn('[QueueStore] Failed to update queue position:', e)
+        );
     },
 
     // Get current track index

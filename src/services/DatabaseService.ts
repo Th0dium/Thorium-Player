@@ -38,6 +38,7 @@ class DatabaseService {
     private static instance: DatabaseService;
     private cache: {
         tracks: Map<string, Track>;
+        tracksByPath: Map<string, Track>; // Secondary index for O(1) path lookups
         playlists: Map<string, Playlist>;
         queues: Map<string, Queue>;
         settings: Settings | null;
@@ -47,6 +48,7 @@ class DatabaseService {
         abRepeat: ABRepeatState | null;
     } = {
             tracks: new Map(),
+            tracksByPath: new Map(),
             playlists: new Map(),
             queues: new Map(),
             settings: null,
@@ -55,6 +57,12 @@ class DatabaseService {
             playbackState: null,
             abRepeat: null,
         };
+
+    // Debounce timers for persistence
+    private tracksPersistTimer: ReturnType<typeof setTimeout> | null = null;
+    private metadataPersistTimer: ReturnType<typeof setTimeout> | null = null;
+    private queuesPersistTimer: ReturnType<typeof setTimeout> | null = null;
+    private static PERSIST_DELAY = 500; // ms debounce for writes
 
     private constructor() { }
 
@@ -85,7 +93,10 @@ class DatabaseService {
 
             if (tracksJson) {
                 const tracks: Track[] = JSON.parse(tracksJson);
-                tracks.forEach(t => this.cache.tracks.set(t.id, t));
+                tracks.forEach(t => {
+                    this.cache.tracks.set(t.id, t);
+                    if (t.path) this.cache.tracksByPath.set(t.path, t);
+                });
             }
 
             if (playlistsJson) {
@@ -124,17 +135,26 @@ class DatabaseService {
 
     // ============ TRACKS ============
     async saveTracks(tracks: Track[]): Promise<void> {
-        tracks.forEach(t => this.cache.tracks.set(t.id, t));
+        tracks.forEach(t => {
+            this.cache.tracks.set(t.id, t);
+            if (t.path) this.cache.tracksByPath.set(t.path, t);
+        });
         await this.persistTracks();
     }
 
     async saveTrack(track: Track): Promise<void> {
         this.cache.tracks.set(track.id, track);
-        await this.persistTracks();
+        if (track.path) this.cache.tracksByPath.set(track.path, track);
+        this.debouncedPersistTracks();
     }
 
     async getTrack(id: string): Promise<Track | undefined> {
         return this.cache.tracks.get(id);
+    }
+
+    /** Get a track by file path — O(1) via secondary index */
+    getTrackByPath(filePath: string): Track | undefined {
+        return this.cache.tracksByPath.get(filePath);
     }
 
     async getAllTracks(): Promise<Track[]> {
@@ -142,8 +162,10 @@ class DatabaseService {
     }
 
     async deleteTrack(id: string): Promise<void> {
+        const track = this.cache.tracks.get(id);
+        if (track?.path) this.cache.tracksByPath.delete(track.path);
         this.cache.tracks.delete(id);
-        await this.persistTracks();
+        this.debouncedPersistTracks();
     }
 
     async updateTrackPlayCount(id: string): Promise<void> {
@@ -151,7 +173,7 @@ class DatabaseService {
         if (track) {
             track.playCount += 1;
             track.lastPlayed = Date.now();
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
     }
 
@@ -160,13 +182,27 @@ class DatabaseService {
         if (track) {
             track.aiTags = tags;
             track.taggedAt = Date.now();
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
     }
 
     private async persistTracks(): Promise<void> {
+        // Cancel any pending debounced write
+        if (this.tracksPersistTimer) {
+            clearTimeout(this.tracksPersistTimer);
+            this.tracksPersistTimer = null;
+        }
         const tracks = Array.from(this.cache.tracks.values());
         await AsyncStorage.setItem(STORAGE_KEYS.TRACKS, JSON.stringify(tracks));
+    }
+
+    /** Debounced persist — batches rapid mutations into a single write */
+    private debouncedPersistTracks(): void {
+        if (this.tracksPersistTimer) clearTimeout(this.tracksPersistTimer);
+        this.tracksPersistTimer = setTimeout(() => {
+            this.tracksPersistTimer = null;
+            this.persistTracks().catch(e => console.error('[DB] Failed to persist tracks:', e));
+        }, DatabaseService.PERSIST_DELAY);
     }
 
     // ============ SONG METADATA (Extended Profiles) ============
@@ -189,7 +225,8 @@ class DatabaseService {
                 rating: null,
             };
             this.cache.songMetadata.set(filePath, metadata);
-            await this.persistSongMetadata();
+            // Debounce instead of immediate persist for newly created metadata
+            this.debouncedPersistSongMetadata();
         }
         return metadata;
     }
@@ -203,16 +240,18 @@ class DatabaseService {
         metadata.playCount += 1;
         metadata.lastPlayedTimestamp = Date.now();
 
-        // Also update the track record
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        // O(1) lookup via path index
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.playCount = metadata.playCount;
             track.lastPlayed = metadata.lastPlayedTimestamp;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
-        console.log(`[DatabaseService] Play count incremented for: ${filePath}, new count: ${metadata.playCount}`);
+        this.debouncedPersistSongMetadata();
+        if (__DEV__) {
+            console.log(`[DatabaseService] Play count incremented for: ${filePath}, new count: ${metadata.playCount}`);
+        }
     }
 
     /**
@@ -223,14 +262,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.lastPlayedTimestamp = Date.now();
 
-        // Also update the track record
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.lastPlayed = metadata.lastPlayedTimestamp;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -240,13 +278,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.skipCount += 1;
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.skipCount = metadata.skipCount;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -260,13 +298,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.totalListenTime += Math.floor(seconds);
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.totalListenTime = metadata.totalListenTime;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -276,13 +314,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.isFavorite = !metadata.isFavorite;
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.isFavorite = metadata.isFavorite;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
         return metadata.isFavorite;
     }
 
@@ -293,13 +331,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.isFavorite = isFavorite;
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.isFavorite = isFavorite;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -309,13 +347,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.bookmarkPosition = positionMs;
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.bookmarkPosition = positionMs;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -333,13 +371,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.bookmarkPosition = null;
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.bookmarkPosition = undefined;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -349,13 +387,13 @@ class DatabaseService {
         const metadata = await this.getSongMetadata(filePath);
         metadata.rating = rating;
 
-        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        const track = this.cache.tracksByPath.get(filePath);
         if (track) {
             track.rating = rating || undefined;
-            await this.persistTracks();
+            this.debouncedPersistTracks();
         }
 
-        await this.persistSongMetadata();
+        this.debouncedPersistSongMetadata();
     }
 
     /**
@@ -401,8 +439,21 @@ class DatabaseService {
     }
 
     private async persistSongMetadata(): Promise<void> {
+        if (this.metadataPersistTimer) {
+            clearTimeout(this.metadataPersistTimer);
+            this.metadataPersistTimer = null;
+        }
         const metadata = Array.from(this.cache.songMetadata.values());
         await AsyncStorage.setItem(STORAGE_KEYS.SONG_METADATA, JSON.stringify(metadata));
+    }
+
+    /** Debounced persist for song metadata */
+    private debouncedPersistSongMetadata(): void {
+        if (this.metadataPersistTimer) clearTimeout(this.metadataPersistTimer);
+        this.metadataPersistTimer = setTimeout(() => {
+            this.metadataPersistTimer = null;
+            this.persistSongMetadata().catch(e => console.error('[DB] Failed to persist metadata:', e));
+        }, DatabaseService.PERSIST_DELAY);
     }
 
     // ============ PLAYLIST ENTRIES (Many-to-Many) ============
@@ -641,7 +692,7 @@ class DatabaseService {
         if (queue) {
             queue.currentIndex = currentIndex;
             queue.lastPlayed = Date.now();
-            await this.persistQueues();
+            this.debouncedPersistQueues();
         }
     }
 
@@ -660,8 +711,21 @@ class DatabaseService {
     }
 
     private async persistQueues(): Promise<void> {
+        if (this.queuesPersistTimer) {
+            clearTimeout(this.queuesPersistTimer);
+            this.queuesPersistTimer = null;
+        }
         const queues = Array.from(this.cache.queues.values());
         await AsyncStorage.setItem(STORAGE_KEYS.QUEUES, JSON.stringify(queues));
+    }
+
+    /** Debounced persist for queues */
+    private debouncedPersistQueues(): void {
+        if (this.queuesPersistTimer) clearTimeout(this.queuesPersistTimer);
+        this.queuesPersistTimer = setTimeout(() => {
+            this.queuesPersistTimer = null;
+            this.persistQueues().catch(e => console.error('[DB] Failed to persist queues:', e));
+        }, DatabaseService.PERSIST_DELAY);
     }
 
     // ============ SETTINGS ============

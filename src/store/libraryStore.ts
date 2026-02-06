@@ -56,6 +56,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
                 databaseService.getAllPlaylists(),
             ]);
 
+            // Build a track Map for O(1) lookups (used below for album/artist track lists)
+            const trackMap = new Map<string, Track>(tracks.map(t => [t.id, t]));
+
             // Build albums and artists from tracks
             const albumMap = new Map<string, Album>();
             const artistMap = new Map<string, Artist>();
@@ -115,17 +118,17 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
                 }
             });
 
-            // Add track counts and tracks to albums
-            albumMap.forEach((album, key) => {
+            // Add track counts and tracks to albums — O(1) per track via Map
+            albumMap.forEach((album) => {
                 album.trackCount = album.trackIds.length;
-                album.tracks = album.trackIds.map(id => tracks.find(t => t.id === id)!).filter(Boolean);
+                album.tracks = album.trackIds.map(id => trackMap.get(id)!).filter(Boolean);
             });
 
-            // Add track/album counts and tracks to artists
+            // Add track/album counts and tracks to artists — O(1) per track via Map
             artistMap.forEach(artist => {
                 artist.trackCount = artist.trackIds.length;
                 artist.albumCount = artist.albumIds.length;
-                artist.tracks = artist.trackIds.map(id => tracks.find(t => t.id === id)!).filter(Boolean);
+                artist.tracks = artist.trackIds.map(id => trackMap.get(id)!).filter(Boolean);
             });
 
             set({
@@ -236,7 +239,7 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
         set({ searchResults: results, searchQuery: query });
     },
 
-    // Playlists
+    // Playlists — optimistic updates: update state first, persist in background
     refreshPlaylists: async () => {
         const playlists = await databaseService.getAllPlaylists();
         set({ playlists });
@@ -244,23 +247,48 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
 
     createPlaylist: async (name, trackIds = []) => {
         const playlist = await databaseService.createPlaylist(name, trackIds);
-        await get().refreshPlaylists();
+        // Optimistic: add to state immediately
+        set(state => ({ playlists: [...state.playlists, playlist] }));
         return playlist;
     },
 
     deletePlaylist: async (id) => {
-        await databaseService.deletePlaylist(id);
-        await get().refreshPlaylists();
+        // Optimistic: remove from state immediately
+        set(state => ({ playlists: state.playlists.filter(p => p.id !== id) }));
+        // Persist in background
+        databaseService.deletePlaylist(id).catch(e =>
+            console.warn('[LibraryStore] Failed to delete playlist:', e)
+        );
     },
 
     addToPlaylist: async (playlistId, trackIds) => {
-        await databaseService.addTracksToPlaylist(playlistId, trackIds);
-        await get().refreshPlaylists();
+        // Optimistic: update state immediately
+        set(state => ({
+            playlists: state.playlists.map(p =>
+                p.id === playlistId
+                    ? { ...p, trackIds: [...p.trackIds, ...trackIds], updatedAt: Date.now() }
+                    : p
+            )
+        }));
+        // Persist in background
+        databaseService.addTracksToPlaylist(playlistId, trackIds).catch(e =>
+            console.warn('[LibraryStore] Failed to add tracks to playlist:', e)
+        );
     },
 
     removeFromPlaylist: async (playlistId, trackId) => {
-        await databaseService.removeTrackFromPlaylist(playlistId, trackId);
-        await get().refreshPlaylists();
+        // Optimistic: update state immediately
+        set(state => ({
+            playlists: state.playlists.map(p =>
+                p.id === playlistId
+                    ? { ...p, trackIds: p.trackIds.filter(id => id !== trackId), updatedAt: Date.now() }
+                    : p
+            )
+        }));
+        // Persist in background
+        databaseService.removeTrackFromPlaylist(playlistId, trackId).catch(e =>
+            console.warn('[LibraryStore] Failed to remove track from playlist:', e)
+        );
     },
 }));
 

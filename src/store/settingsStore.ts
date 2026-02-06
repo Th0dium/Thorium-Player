@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SETTINGS_STORAGE_KEY = '@thorium/ui_settings';
+let settingsPersistTimer: ReturnType<typeof setTimeout> | null = null;
+const SETTINGS_PERSIST_DELAY = 1000; // 1 second debounce
 
 export type TabId = 'queue' | 'nowPlaying' | 'library' | 'folders' | 'albums' | 'artists' | 'playlists' | 'genres' | 'songs';
 export type ThemeOption = 'dark' | 'light' | 'system' | 'amoled';
@@ -125,29 +127,33 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         }
     },
 
-    // Save settings to storage
+    // Save settings to storage (debounced to batch rapid changes)
     saveSettings: async () => {
-        try {
-            const state = get();
-            const settings: UISettings = {
-                selectedTabs: state.selectedTabs,
-                theme: state.theme,
-                accentColor: state.accentColor,
-                folderView: state.folderView,
-                queueBehavior: state.queueBehavior,
-                pauseOnUnplug: state.pauseOnUnplug,
-                resumeOnBluetooth: state.resumeOnBluetooth,
-                autoScanOnStartup: state.autoScanOnStartup,
-                showTrackNotification: state.showTrackNotification,
-                gaplessPlayback: state.gaplessPlayback,
-                closeOnQueueEnd: state.closeOnQueueEnd,
-                librarySubScreen: state.librarySubScreen,
-                librarySubTitle: state.librarySubTitle,
-            };
-            await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-        } catch (error) {
-            console.error('[SettingsStore] Error saving settings:', error);
-        }
+        if (settingsPersistTimer) clearTimeout(settingsPersistTimer);
+        settingsPersistTimer = setTimeout(async () => {
+            settingsPersistTimer = null;
+            try {
+                const state = get();
+                const settings: UISettings = {
+                    selectedTabs: state.selectedTabs,
+                    theme: state.theme,
+                    accentColor: state.accentColor,
+                    folderView: state.folderView,
+                    queueBehavior: state.queueBehavior,
+                    pauseOnUnplug: state.pauseOnUnplug,
+                    resumeOnBluetooth: state.resumeOnBluetooth,
+                    autoScanOnStartup: state.autoScanOnStartup,
+                    showTrackNotification: state.showTrackNotification,
+                    gaplessPlayback: state.gaplessPlayback,
+                    closeOnQueueEnd: state.closeOnQueueEnd,
+                    librarySubScreen: state.librarySubScreen,
+                    librarySubTitle: state.librarySubTitle,
+                };
+                await AsyncStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+            } catch (error) {
+                console.error('[SettingsStore] Error saving settings:', error);
+            }
+        }, SETTINGS_PERSIST_DELAY);
     },
 
     // Individual setters

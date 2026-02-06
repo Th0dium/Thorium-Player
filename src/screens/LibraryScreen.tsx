@@ -40,18 +40,33 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({
     const playlists = useLibraryStore(state => state.playlists);
     const [playlistSearch, setPlaylistSearch] = useState('');
 
-    // Calculate counts for each category
+    // Calculate counts for each category in a single pass
     const categoryCounts = useMemo(() => {
         const now = Date.now();
         const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
 
+        let favorites = 0;
+        let recentlyAdded = 0;
+        let recentlyPlayed = 0;
+        let mostPlayed = 0;
+        let notPlayed = 0;
+
+        for (let i = 0; i < tracks.length; i++) {
+            const t = tracks[i];
+            if (t.isFavorite) favorites++;
+            if (t.dateAdded && t.dateAdded > oneWeekAgo) recentlyAdded++;
+            if (t.lastPlayed && t.lastPlayed > oneWeekAgo) recentlyPlayed++;
+            if ((t.playCount || 0) >= 5) mostPlayed++;
+            if (!t.playCount || t.playCount === 0) notPlayed++;
+        }
+
         return {
             allSongs: tracks.length,
-            favorites: tracks.filter(t => t.isFavorite).length,
-            recentlyAdded: tracks.filter(t => t.dateAdded && t.dateAdded > oneWeekAgo).length,
-            recentlyPlayed: tracks.filter(t => t.lastPlayed && t.lastPlayed > oneWeekAgo).length,
-            mostPlayed: tracks.filter(t => (t.playCount || 0) >= 5).length,
-            notPlayed: tracks.filter(t => !t.playCount || t.playCount === 0).length,
+            favorites,
+            recentlyAdded,
+            recentlyPlayed,
+            mostPlayed,
+            notPlayed,
         };
     }, [tracks]);
 

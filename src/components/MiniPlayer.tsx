@@ -235,4 +235,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default MiniPlayer;
+export default memo(MiniPlayer);

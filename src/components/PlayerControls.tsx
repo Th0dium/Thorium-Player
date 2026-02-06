@@ -1,5 +1,5 @@
 // Player Controls Component - Main playback controls with animated feedback
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, memo } from 'react';
 import {
     View,
     TouchableOpacity,
@@ -212,4 +212,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default PlayerControls;
+export default memo(PlayerControls);

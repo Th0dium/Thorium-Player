@@ -116,15 +116,16 @@ module.exports = async function () {
     });
 
     // Handle playback state changes - sync isPlaying to playerStore
+    // Only respond to settled states (Playing/Paused/Stopped) to avoid
+    // unnecessary re-renders from transient states like Buffering/Ready
     TrackPlayer.addEventListener(Event.PlaybackState, (event) => {
         try {
-            const isPlaying = event.state === State.Playing;
-            const isPaused = event.state === State.Paused || event.state === State.Stopped || event.state === State.None;
-            if (isPlaying) {
+            if (event.state === State.Playing) {
                 usePlayerStore.getState().setIsPlaying(true);
-            } else if (isPaused) {
+            } else if (event.state === State.Paused || event.state === State.Stopped || event.state === State.None) {
                 usePlayerStore.getState().setIsPlaying(false);
             }
+            // Ignore transient states: Buffering, Ready, Connecting, etc.
         } catch (e) {
             // Store might not be available
         }

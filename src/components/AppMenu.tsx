@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
@@ -22,7 +22,7 @@ interface AppMenuProps {
     onHelp?: () => void;
 }
 
-const AppMenu: React.FC<AppMenuProps> = ({
+const AppMenu: React.FC<AppMenuProps> = memo(function AppMenu({
     visible,
     onClose,
     onScan,
@@ -30,12 +30,12 @@ const AppMenu: React.FC<AppMenuProps> = ({
     onSleepTimer,
     onEqualizer,
     onHelp,
-}) => {
+}) {
     const { colors } = useTheme();
 
-    const closeMenu = () => onClose();
+    const closeMenu = useCallback(() => onClose(), [onClose]);
 
-    const menuItems = [
+    const menuItems = useMemo(() => [
         {
             id: 'scan',
             label: 'Scan Library',
@@ -81,11 +81,14 @@ const AppMenu: React.FC<AppMenuProps> = ({
                 onHelp?.();
             },
         },
-    ];
+    ], [closeMenu, onScan, onEqualizer, onSleepTimer, onSettings, onHelp]);
+
+    // Don't render Modal at all when not visible
+    if (!visible) return null;
 
     return (
         <Modal
-            visible={visible}
+            visible={true}
             transparent
             animationType="fade"
             statusBarTranslucent
@@ -145,7 +148,7 @@ const AppMenu: React.FC<AppMenuProps> = ({
             </Pressable>
         </Modal>
     );
-};
+});
 
 const styles = StyleSheet.create({
     modalOverlay: {

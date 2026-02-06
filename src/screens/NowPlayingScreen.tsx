@@ -343,11 +343,13 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                 </SafeAreaView>
             </LinearGradient>
 
-            {/* Sleep Timer Modal */}
-            <SleepTimerModal
-                visible={showSleepTimer}
-                onClose={() => setShowSleepTimer(false)}
-            />
+            {/* Sleep Timer Modal - only mount when visible */}
+            {showSleepTimer && (
+                <SleepTimerModal
+                    visible={showSleepTimer}
+                    onClose={() => setShowSleepTimer(false)}
+                />
+            )}
         </View>
     );
 };

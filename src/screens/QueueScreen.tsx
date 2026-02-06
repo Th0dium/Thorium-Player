@@ -53,6 +53,27 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
     const [editingName, setEditingName] = useState('');
 
+    // Get tracks from current queue — must come before scrollToCurrentTrack
+    const queueTracks = useMemo(() => {
+        if (!currentQueue || currentQueue.trackIds.length === 0) return [];
+
+        // Use a Map for O(1) lookups
+        const trackMap = new Map(tracks.map(t => [t.id, t]));
+        return currentQueue.trackIds
+            .map(id => trackMap.get(id))
+            .filter((t): t is Track => t !== undefined);
+    }, [currentQueue?.trackIds, tracks]); // Only re-run if track IDs or the library changes
+
+    // Filter tracks based on search
+    const filteredTracks = useMemo(() => {
+        if (!isSearchActive || !searchQuery) return queueTracks;
+        const query = searchQuery.toLowerCase();
+        return queueTracks.filter(track =>
+            track.title.toLowerCase().includes(query) ||
+            track.artist.toLowerCase().includes(query)
+        );
+    }, [queueTracks, searchQuery, isSearchActive]);
+
     // Scroll to current index when queue changes or initial load
     const scrollToCurrentTrack = useCallback(() => {
         if (!currentQueue || currentQueue.trackIds.length === 0 || currentIndex < 0) return;
@@ -81,27 +102,6 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
             return () => clearTimeout(timer);
         }
     }, [currentQueue?.id, currentIndex, scrollToCurrentTrack]);
-
-    // Get tracks from current queue
-    const queueTracks = useMemo(() => {
-        if (!currentQueue || currentQueue.trackIds.length === 0) return [];
-
-        // Use a Map for O(1) lookups
-        const trackMap = new Map(tracks.map(t => [t.id, t]));
-        return currentQueue.trackIds
-            .map(id => trackMap.get(id))
-            .filter((t): t is Track => t !== undefined);
-    }, [currentQueue?.trackIds, tracks]); // Only re-run if track IDs or the library changes
-
-    // Filter tracks based on search
-    const filteredTracks = useMemo(() => {
-        if (!isSearchActive || !searchQuery) return queueTracks;
-        const query = searchQuery.toLowerCase();
-        return queueTracks.filter(track =>
-            track.title.toLowerCase().includes(query) ||
-            track.artist.toLowerCase().includes(query)
-        );
-    }, [queueTracks, searchQuery, isSearchActive]);
 
     const handleSwitchQueue = useCallback((index: number) => {
         switchQueue(index);
@@ -416,19 +416,22 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 <DraggableFlatList
                     ref={flatListRef}
                     data={filteredTracks}
-                    keyExtractor={(item, index) => `${item.id}-${index}`}
+                    keyExtractor={(item) => item.id}
                     renderItem={renderQueueItem}
                     onDragEnd={handleDragEnd}
                     containerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 120 }}
                     activationDistance={10}
-                    // Render all items upfront so heights are measured
-                    // This makes scrollToIndex work perfectly without height calculations
-                    initialNumToRender={Math.min(filteredTracks.length, 100)}
-                    maxToRenderPerBatch={50}
-                    windowSize={21}
-                    removeClippedSubviews={false}
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={10}
+                    windowSize={7}
+                    removeClippedSubviews={true}
+                    getItemLayout={(_, index) => ({
+                        length: 64,
+                        offset: 64 * index,
+                        index,
+                    })}
                     onScrollToIndexFailed={(info) => {
                         // Fallback: scroll to offset, wait for render, then retry
                         flatListRef.current?.scrollToOffset({

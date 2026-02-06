@@ -36,10 +36,12 @@ const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onP
     const deletePlaylist = useLibraryStore(state => state.deletePlaylist);
     const createQueue = useQueueStore(state => state.createQueue);
 
-    // Filter playlists
-    const filteredPlaylists = searchQuery.trim()
-        ? playlists.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-        : playlists;
+    // Filter playlists - memoize to avoid creating new array reference every render
+    const filteredPlaylists = useMemo(() => {
+        return searchQuery.trim()
+            ? playlists.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+            : playlists;
+    }, [playlists, searchQuery]);
 
     const handleCreatePlaylist = useCallback(async () => {
         if (!newPlaylistName.trim()) {
