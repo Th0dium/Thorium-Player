@@ -62,7 +62,9 @@ class PlaybackTracker {
         // Start progress monitoring
         this.startProgressMonitoring();
 
-        console.log('[PlaybackTracker] Initialized');
+        if (__DEV__) {
+            console.log('[PlaybackTracker] Initialized');
+        }
     }
 
     /**
@@ -90,7 +92,9 @@ class PlaybackTracker {
             // Record that playback started (update lastPlayed timestamp immediately)
             if (trackPath) {
                 await databaseService.updateLastPlayed(trackPath);
-                console.log('[PlaybackTracker] Now tracking:', event.track.title);
+                if (__DEV__) {
+                    console.log('[PlaybackTracker] Now tracking:', event.track.title);
+                }
             }
         } else {
             // No track - reset state completely
@@ -189,7 +193,9 @@ class PlaybackTracker {
         this.trackingState.hasCountedPlay = true;
         await databaseService.incrementPlayCount(this.trackingState.currentTrackPath);
 
-        console.log('[PlaybackTracker] Play count incremented for:', this.trackingState.currentTrackPath);
+        if (__DEV__) {
+            console.log('[PlaybackTracker] Play count incremented for:', this.trackingState.currentTrackPath);
+        }
     }
 
     /**
@@ -202,7 +208,9 @@ class PlaybackTracker {
         // Only count as skip if listened for at least 3 seconds
         if (this.trackingState.totalListenedTime >= 3) {
             await databaseService.incrementSkipCount(this.trackingState.currentTrackPath);
-            console.log('[PlaybackTracker] Skip recorded for:', this.trackingState.currentTrackPath);
+            if (__DEV__) {
+                console.log('[PlaybackTracker] Skip recorded for:', this.trackingState.currentTrackPath);
+            }
         }
     }
 

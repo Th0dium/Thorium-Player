@@ -42,7 +42,9 @@ async function extractFileMetadata(filePath: string): Promise<AudioMetadata | nu
  * The native module can be accessed in different ways depending on linking
  */
 async function getMusicFilesData(): Promise<any[]> {
-    console.log('[LibraryProfiling] Attempting to get music files data...');
+    if (__DEV__) {
+        console.log('[LibraryProfiling] Attempting to get music files data...');
+    }
 
     // Approach 1: Try require with default export
     try {
@@ -50,7 +52,9 @@ async function getMusicFilesData(): Promise<any[]> {
         const MusicFiles = MusicFilesModule.default || MusicFilesModule;
 
         if (MusicFiles && typeof MusicFiles.getAll === 'function') {
-            console.log('[LibraryProfiling] Using react-native-get-music-files (require)');
+            if (__DEV__) {
+                console.log('[LibraryProfiling] Using react-native-get-music-files (require)');
+            }
             // Configure to scan ALL audio files, not just default folders
             const result = await MusicFiles.getAll({
                 blured: false,  // Don't blur artwork
@@ -65,28 +69,34 @@ async function getMusicFilesData(): Promise<any[]> {
             });
 
             if (result && typeof result !== 'string' && Array.isArray(result)) {
-                console.log(`[LibraryProfiling] Got ${result.length} files from react-native-get-music-files`);
-                // Debug: Log first result to see structure
-                if (result.length > 0) {
-                    const sample = result[0];
-                    const coverPreview = sample.cover ? sample.cover.substring(0, 100) + '...' : 'none';
-                    console.log('[LibraryProfiling] Sample metadata:', JSON.stringify({
-                        ...sample,
-                        cover: coverPreview, // Don't log full base64
-                    }, null, 2));
+                if (__DEV__) {
+                    console.log(`[LibraryProfiling] Got ${result.length} files from react-native-get-music-files`);
+                    // Debug: Log first result to see structure
+                    if (result.length > 0) {
+                        const sample = result[0];
+                        const coverPreview = sample.cover ? sample.cover.substring(0, 100) + '...' : 'none';
+                        console.log('[LibraryProfiling] Sample metadata:', JSON.stringify({
+                            ...sample,
+                            cover: coverPreview, // Don't log full base64
+                        }, null, 2));
+                    }
                 }
                 return result;
             }
         }
     } catch (e) {
-        console.log('[LibraryProfiling] require approach failed:', e);
+        if (__DEV__) {
+            console.log('[LibraryProfiling] require approach failed:', e);
+        }
     }
 
     // Approach 2: Try NativeModules.RNAndroidAudioStore (the actual native module name)
     try {
         const nativeModule = NativeModules.RNAndroidAudioStore;
         if (nativeModule && typeof nativeModule.getAll === 'function') {
-            console.log('[LibraryProfiling] Using NativeModules.RNAndroidAudioStore');
+            if (__DEV__) {
+                console.log('[LibraryProfiling] Using NativeModules.RNAndroidAudioStore');
+            }
             const result = await nativeModule.getAll({
                 blured: false,
                 artist: true,
@@ -99,19 +109,25 @@ async function getMusicFilesData(): Promise<any[]> {
                 coverFolder: '/storage/emulated/0/',
             });
             if (result && Array.isArray(result)) {
-                console.log(`[LibraryProfiling] Got ${result.length} files from NativeModules.RNAndroidAudioStore`);
+                if (__DEV__) {
+                    console.log(`[LibraryProfiling] Got ${result.length} files from NativeModules.RNAndroidAudioStore`);
+                }
                 return result;
             }
         }
     } catch (e) {
-        console.log('[LibraryProfiling] NativeModules.RNAndroidAudioStore not available:', e);
+        if (__DEV__) {
+            console.log('[LibraryProfiling] NativeModules.RNAndroidAudioStore not available:', e);
+        }
     }
 
     // Approach 3: Try NativeModules.MusicFiles
     try {
         const nativeModule = NativeModules.MusicFiles;
         if (nativeModule && typeof nativeModule.getAll === 'function') {
-            console.log('[LibraryProfiling] Using NativeModules.MusicFiles');
+            if (__DEV__) {
+                console.log('[LibraryProfiling] Using NativeModules.MusicFiles');
+            }
             const result = await nativeModule.getAll({
                 blured: false,
                 artist: true,

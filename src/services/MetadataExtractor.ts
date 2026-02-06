@@ -63,7 +63,9 @@ class MetadataExtractor {
                 return [];
             }
 
-            console.log(`[MetadataExtractor] Found ${results.length} audio files`);
+            if (__DEV__) {
+                console.log(`[MetadataExtractor] Found ${results.length} audio files`);
+            }
 
             return results.map((file: any) => this.convertToTrack(file as MusicFileMetadata));
         } catch (error) {

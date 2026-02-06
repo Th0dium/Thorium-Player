@@ -59,7 +59,9 @@ module.exports = async function () {
                     }
                 } catch (e) {
                     // Settings store might not be available in service context
-                    console.log('[PlaybackService] Could not check settings for auto-resume');
+                    if (__DEV__) {
+                        console.log('[PlaybackService] Could not check settings for auto-resume');
+                    }
                 }
                 wasPlayingBeforeNoisy = false;
             }
@@ -68,11 +70,15 @@ module.exports = async function () {
 
     // Handle playback ending
     TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async (event) => {
-        console.log('Queue ended', event);
+        if (__DEV__) {
+            console.log('Queue ended', event);
+        }
         try {
             const { closeOnQueueEnd } = useSettingsStore.getState();
             if (closeOnQueueEnd) {
-                console.log('[PlaybackService] Queue ended - closing app per user setting');
+                if (__DEV__) {
+                    console.log('[PlaybackService] Queue ended - closing app per user setting');
+                }
                 await TrackPlayer.stop();
                 BackHandler.exitApp();
             }
@@ -84,7 +90,9 @@ module.exports = async function () {
     // Handle track change - sync player store and queue store with TrackPlayer
     TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
         if (event.track && event.index !== undefined) {
-            console.log('[PlaybackService] Track changed:', event.track.title, 'index:', event.index);
+            if (__DEV__) {
+                console.log('[PlaybackService] Track changed:', event.track.title, 'index:', event.index);
+            }
             try {
                 // Update queue store's current index
                 const queueState = useQueueStore.getState();

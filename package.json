@@ -4,9 +4,13 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "android:release": "react-native run-android --mode=release",
+    "android:fast": "react-native start --reset-cache & react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
+    "start:fast": "react-native start --reset-cache --max-workers 4",
+    "start:production": "react-native start --reset-cache --max-workers=8 --transformer.minifierPath=metro-minify-terser",
     "test": "jest"
   },
   "dependencies": {

@@ -94,9 +94,18 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
                 if (queueTracks.length > 0) {
                     await audioService.setQueue(queueTracks);
-                    // Don't auto-play, just set up the queue
-                    // We also don't seek to the last position yet to avoid auto-start behavior
-                    // unless we want to restore exact state (which is usually good UX)
+
+                    // Set the current track in playerStore based on the queue's currentIndex
+                    const currentTrackIndex = lastQueue.currentIndex ?? 0;
+                    if (currentTrackIndex >= 0 && currentTrackIndex < queueTracks.length) {
+                        // Skip to the last played track in the audio service
+                        await audioService.skipToTrack(currentTrackIndex);
+                        // Update the playerStore to match
+                        usePlayerStore.getState().setCurrentTrack(queueTracks[currentTrackIndex]);
+                    }
+
+                    // Queue is set up at the correct position but not playing
+                    // User will resume playback from mini-player or now-playing screen
                 }
             } catch (error) {
                 console.warn('[QueueStore] Failed to hydrate player queue on load:', error);
@@ -107,10 +116,10 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     // Create a new queue and start playing
     createQueue: async (tracks, source, startIndex = 0) => {
         const { queues, deleteQueue } = get();
-        
+
         // Find if a queue with same name and same source type already exists
-        const existingQueue = queues.find(q => 
-            q.name === source.name && 
+        const existingQueue = queues.find(q =>
+            q.name === source.name &&
             q.source.type === source.type &&
             (source.id ? q.source.id === source.id : true)
         );
@@ -374,6 +383,11 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
         const updatedQueue = { ...currentQueue, currentIndex: index };
         set({ currentQueue: updatedQueue, currentIndex: index });
+
+        // Persist the queue position to database
+        databaseService.updateQueuePosition(currentQueue.id, index).catch(e =>
+            console.warn('[QueueStore] Failed to save queue position:', e)
+        );
     },
 
     // Shuffle queue

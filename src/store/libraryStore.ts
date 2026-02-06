@@ -149,7 +149,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
             const scanPaths = paths || fileSystemService.getDefaultMusicPaths();
             const settings = await databaseService.getSettings();
 
-            console.log('[LibraryStore] Starting scan with paths:', scanPaths);
+            if (__DEV__) {
+                console.log('[LibraryStore] Starting scan with paths:', scanPaths);
+            }
 
             // Step 1: Scan filesystem for audio files (30%)
             const { tracks: scannedTracks, folders } = await fileSystemService.scanDirectories(
@@ -157,7 +159,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
                 settings.excludeFolders
             );
 
-            console.log(`[LibraryStore] Found ${scannedTracks.length} audio files`);
+            if (__DEV__) {
+                console.log(`[LibraryStore] Found ${scannedTracks.length} audio files`);
+            }
             set({ scanProgress: 30 });
 
             // Step 2: Profile tracks with metadata from MusicFiles API (30% -> 80%)
@@ -171,7 +175,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
                 }
             );
 
-            console.log(`[LibraryStore] Profiled ${profiledTracks.length} tracks`);
+            if (__DEV__) {
+                console.log(`[LibraryStore] Profiled ${profiledTracks.length} tracks`);
+            }
             set({ scanProgress: 85 });
 
             // Step 3: Merge with existing tracks (preserve AI tags)
@@ -197,9 +203,9 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
             await databaseService.saveTracks(mergedTracks);
 
             set({ scanProgress: 100, folders });
-            console.log(`[LibraryStore] Saved ${mergedTracks.length} tracks to database`);
-
-            // Reload library to update UI
+            if (__DEV__) {
+                console.log(`[LibraryStore] Saved ${mergedTracks.length} tracks to database`);
+            }
             await get().loadLibrary();
         } catch (error) {
             console.error('Error scanning for music:', error);

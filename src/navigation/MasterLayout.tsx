@@ -67,7 +67,8 @@ const MasterLayout: React.FC = () => {
     const librarySubTitle = useSettingsStore(state => state.librarySubTitle);
     const setLibraryNavigation = useSettingsStore(state => state.setLibraryNavigation);
 
-    const [activeTab, setActiveTab] = useState<TabId>('library');
+    // Initialize to nowPlaying if there's a current track, otherwise library
+    const [activeTab, setActiveTab] = useState<TabId>(() => hasCurrentTrack ? 'nowPlaying' : 'library');
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isMenuVisible, setIsMenuVisible] = useState(false);
@@ -245,7 +246,7 @@ const MasterLayout: React.FC = () => {
                     content = (
                         <SongsListScreen
                             filter={filter}
-                            {...{[filter + 'Id']: idAttr}}
+                            {...{ [filter + 'Id']: idAttr }}
                             title={librarySubTitle}
                             searchQuery={searchQuery}
                             isSearchActive={isSearchVisible && searchQuery.length > 0}
@@ -258,13 +259,13 @@ const MasterLayout: React.FC = () => {
         }
 
         if (!content) {
-            switch(tabId) {
+            switch (tabId) {
                 case 'queue': content = <QueueScreen {...screenProps} />; break;
                 case 'nowPlaying': content = <NowPlayingScreen />; break;
                 case 'library': content = <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />; break;
                 case 'folders': content = <FoldersScreen {...screenProps} />; break;
-                case 'playlists': content = <PlaylistsScreen {...screenProps} onPlaylistPress={(p) => handleLibraryNavigate(`playlist-${p.id}`, {title: p.name})} />; break;
-                case 'genres': content = <GenresScreen {...screenProps} onGenrePress={(g) => handleLibraryNavigate(`genre-${g.id}`, {title: g.name})} />; break;
+                case 'playlists': content = <PlaylistsScreen {...screenProps} onPlaylistPress={(p) => handleLibraryNavigate(`playlist-${p.id}`, { title: p.name })} />; break;
+                case 'genres': content = <GenresScreen {...screenProps} onGenrePress={(g) => handleLibraryNavigate(`genre-${g.id}`, { title: g.name })} />; break;
                 case 'songs': content = <SongsScreen {...screenProps} />; break;
                 default: content = <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />;
             }
@@ -287,9 +288,9 @@ const MasterLayout: React.FC = () => {
             {/* Zone A: Navigation Header */}
             <SafeAreaView edges={['top']} style={[styles.header, { backgroundColor: colors.background }]}>
                 <View style={styles.headerContent}>
-                    <TopTabBar 
-                        tabs={visibleTabs} 
-                        activeTab={activeTab} 
+                    <TopTabBar
+                        tabs={visibleTabs}
+                        activeTab={activeTab}
                         onTabPress={handleTabPress}
                         scrollX={scrollX}
                     />
