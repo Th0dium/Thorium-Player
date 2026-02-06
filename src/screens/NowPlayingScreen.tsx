@@ -42,12 +42,10 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
     const skipNext = usePlayerStore(s => s.skipNext);
     const skipPrevious = usePlayerStore(s => s.skipPrevious);
     const panY = useRef(new Animated.Value(0)).current;
-    const panX = useRef(new Animated.Value(0)).current;
     const artworkScale = useRef(new Animated.Value(0.85)).current;
     const artworkOpacity = useRef(new Animated.Value(0)).current;
     const heartScale = useRef(new Animated.Value(1)).current;
     const prevTrackId = useRef<string | null>(null);
-    const isSwipingHorizontal = useRef(false);
 
     // Album art entrance + crossfade on track change
     useEffect(() => {
@@ -91,84 +89,39 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
         // TODO: toggleFavorite()
     }, [heartScale]);
 
-    // Pan responder for swipe-down to dismiss AND horizontal swipe to skip
+    // Pan responder for swipe-down to dismiss
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (_, gestureState) => {
                 const absX = Math.abs(gestureState.dx);
                 const absY = Math.abs(gestureState.dy);
-                // Activate on meaningful movement in either direction
-                return absY > 10 || absX > 15;
-            },
-            onPanResponderGrant: () => {
-                isSwipingHorizontal.current = false;
+                // Activate only on vertical movement to allow scroll/other interactions if needed
+                // dy > 0 ensures we only respond to downward swipes
+                return absY > 10 && absY > absX && gestureState.dy > 0;
             },
             onPanResponderMove: (_, gestureState) => {
-                const absX = Math.abs(gestureState.dx);
-                const absY = Math.abs(gestureState.dy);
-
-                // Determine direction on first significant move
-                if (!isSwipingHorizontal.current && absX > absY && absX > 15) {
-                    isSwipingHorizontal.current = true;
-                }
-
-                if (isSwipingHorizontal.current) {
-                    panX.setValue(gestureState.dx);
-                } else if (gestureState.dy > 0) {
+                if (gestureState.dy > 0) {
                     panY.setValue(gestureState.dy);
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
-                if (isSwipingHorizontal.current) {
-                    const HORIZONTAL_THRESHOLD = 80;
-                    if (gestureState.dx < -HORIZONTAL_THRESHOLD) {
-                        // Swiped left → skip to next
-                        Animated.timing(panX, {
-                            toValue: -SCREEN_WIDTH,
-                            duration: 200,
-                            useNativeDriver: true,
-                        }).start(() => {
-                            skipNext();
-                            panX.setValue(0);
-                        });
-                    } else if (gestureState.dx > HORIZONTAL_THRESHOLD) {
-                        // Swiped right → skip to previous
-                        Animated.timing(panX, {
-                            toValue: SCREEN_WIDTH,
-                            duration: 200,
-                            useNativeDriver: true,
-                        }).start(() => {
-                            skipPrevious();
-                            panX.setValue(0);
-                        });
-                    } else {
-                        // Snap back
-                        Animated.spring(panX, {
-                            toValue: 0,
-                            useNativeDriver: true,
-                            tension: 100,
-                            friction: 10,
-                        }).start();
+                if (gestureState.dy > SWIPE_THRESHOLD) {
+                    // Swipe was far enough - collapse
+                    if (onCollapse) {
+                        onCollapse();
+                    } else if (navigation) {
+                        navigation.goBack();
                     }
-                } else {
-                    if (gestureState.dy > SWIPE_THRESHOLD) {
-                        // Swipe was far enough - collapse
-                        if (onCollapse) {
-                            onCollapse();
-                        } else if (navigation) {
-                            navigation.goBack();
-                        }
-                    }
-                    // Reset vertical position
-                    Animated.spring(panY, {
-                        toValue: 0,
-                        useNativeDriver: true,
-                        tension: 100,
-                        friction: 10,
-                    }).start();
                 }
-                isSwipingHorizontal.current = false;
+                
+                // Reset vertical position
+                Animated.spring(panY, {
+                    toValue: 0,
+                    useNativeDriver: true,
+                    tension: 100,
+                    friction: 10,
+                }).start();
             },
         })
     ).current;
@@ -231,7 +184,7 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                         </View>
                     </View>
 
-                    {/* Album Artwork - Animated entrance + crossfade + swipe to skip */}
+                    {/* Album Artwork - Animated entrance + crossfade */}
                     <TouchableOpacity
                         style={styles.artworkContainer}
                         activeOpacity={0.9}
@@ -240,16 +193,8 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                         <Animated.View style={{
                             transform: [
                                 { scale: artworkScale },
-                                { translateX: panX },
                             ],
-                            opacity: Animated.add(
-                                artworkOpacity,
-                                panX.interpolate({
-                                    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
-                                    outputRange: [-0.5, 0, -0.5],
-                                    extrapolate: 'clamp',
-                                })
-                            ),
+                            opacity: artworkOpacity,
                         }}>
                             {currentTrack.albumArt ? (
                                 <Image
