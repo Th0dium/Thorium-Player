@@ -1,4 +1,4 @@
-Musicolet Main Interface: Architectural Blueprint
+Thorium Player Main Interface: Architectural Blueprint
 1. The Master Layout (UI Hierarchy)
 The interface is divided into three fixed zones that never disappear, ensuring zero-latency navigation.
 
@@ -30,7 +30,7 @@ Interaction: Tapping the artwork toggles Lyrics Overlay. Long-pressing allows th
 Dynamic Background: A blurred, desaturated version of the current album art that fills the entire screen background.
 
 Functional Controls (The "Power User" Row)
-Below the album art, Musicolet places 4–5 small icon buttons for quick access:
+Below the album art, Thorium Player places 4–5 small icon buttons for quick access:
 
 Queue Icon: Opens the list of upcoming songs.
 
@@ -71,7 +71,7 @@ Contains: [Equalizer], [Sleep Timer], [Settings], [Close App].
 
 Search Bar:
 
-Unlike other apps, Musicolet’s search is "context-aware." If you are in the [Artists] tab and tap search, it prioritizes artists. If you tap the global search, it searches the entire device storage.
+Unlike other apps, Thorium Player’s search is "context-aware." If you are in the [Artists] tab and tap search, it prioritizes artists. If you tap the global search, it searches the entire device storage.
 
 Agent Implementation Checklist
 No Navigation Drawer: Ensure the agent does not build a hamburger menu; use the horizontal top tabs instead.

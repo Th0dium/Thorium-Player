@@ -1,5 +1,5 @@
 // AI Screen - AI tag management and smart playlist creation
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -35,7 +35,9 @@ const AIScreen: React.FC<AIScreenProps> = ({ navigation }) => {
     const [selectedTracks, setSelectedTracks] = useState<Track[]>([]);
     const [isTagging, setIsTagging] = useState(false);
 
-    const { tracks, playlists, refreshPlaylists } = useLibraryStore();
+    const tracks = useLibraryStore(state => state.tracks);
+    const playlists = useLibraryStore(state => state.playlists);
+    const refreshPlaylists = useLibraryStore(state => state.refreshPlaylists);
 
     useEffect(() => {
         loadTags();

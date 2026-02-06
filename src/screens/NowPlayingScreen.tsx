@@ -1,6 +1,6 @@
 // Now Playing Screen - Full-screen player with album art and controls
 // Musicolet-style: Dynamic background, power-user row, swipe-to-dismiss
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -37,37 +37,138 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
     onCollapse
 }) => {
     const { colors } = useTheme();
-    const { currentTrack, volume } = usePlayerStore();
+    const currentTrack = usePlayerStore(s => s.currentTrack);
+    const volume = usePlayerStore(s => s.volume);
+    const skipNext = usePlayerStore(s => s.skipNext);
+    const skipPrevious = usePlayerStore(s => s.skipPrevious);
     const panY = useRef(new Animated.Value(0)).current;
+    const panX = useRef(new Animated.Value(0)).current;
+    const artworkScale = useRef(new Animated.Value(0.85)).current;
+    const artworkOpacity = useRef(new Animated.Value(0)).current;
+    const heartScale = useRef(new Animated.Value(1)).current;
+    const prevTrackId = useRef<string | null>(null);
+    const isSwipingHorizontal = useRef(false);
 
-    // Pan responder for swipe-down to dismiss
+    // Album art entrance + crossfade on track change
+    useEffect(() => {
+        const trackId = currentTrack?.id || null;
+        if (trackId !== prevTrackId.current) {
+            prevTrackId.current = trackId;
+            artworkScale.setValue(0.85);
+            artworkOpacity.setValue(0);
+            Animated.parallel([
+                Animated.spring(artworkScale, {
+                    toValue: 1,
+                    useNativeDriver: true,
+                    tension: 60,
+                    friction: 8,
+                }),
+                Animated.timing(artworkOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [currentTrack?.id, artworkScale, artworkOpacity]);
+
+    // Favorite heart bounce
+    const handleFavoritePress = useCallback(() => {
+        Animated.sequence([
+            Animated.spring(heartScale, {
+                toValue: 1.4,
+                useNativeDriver: true,
+                speed: 50,
+                bounciness: 12,
+            }),
+            Animated.spring(heartScale, {
+                toValue: 1,
+                useNativeDriver: true,
+                speed: 30,
+                bounciness: 8,
+            }),
+        ]).start();
+        // TODO: toggleFavorite()
+    }, [heartScale]);
+
+    // Pan responder for swipe-down to dismiss AND horizontal swipe to skip
     const panResponder = useRef(
         PanResponder.create({
             onStartShouldSetPanResponder: () => false,
             onMoveShouldSetPanResponder: (_, gestureState) => {
-                return gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+                const absX = Math.abs(gestureState.dx);
+                const absY = Math.abs(gestureState.dy);
+                // Activate on meaningful movement in either direction
+                return absY > 10 || absX > 15;
+            },
+            onPanResponderGrant: () => {
+                isSwipingHorizontal.current = false;
             },
             onPanResponderMove: (_, gestureState) => {
-                if (gestureState.dy > 0) {
+                const absX = Math.abs(gestureState.dx);
+                const absY = Math.abs(gestureState.dy);
+
+                // Determine direction on first significant move
+                if (!isSwipingHorizontal.current && absX > absY && absX > 15) {
+                    isSwipingHorizontal.current = true;
+                }
+
+                if (isSwipingHorizontal.current) {
+                    panX.setValue(gestureState.dx);
+                } else if (gestureState.dy > 0) {
                     panY.setValue(gestureState.dy);
                 }
             },
             onPanResponderRelease: (_, gestureState) => {
-                if (gestureState.dy > SWIPE_THRESHOLD) {
-                    // Swipe was far enough - collapse
-                    if (onCollapse) {
-                        onCollapse();
-                    } else if (navigation) {
-                        navigation.goBack();
+                if (isSwipingHorizontal.current) {
+                    const HORIZONTAL_THRESHOLD = 80;
+                    if (gestureState.dx < -HORIZONTAL_THRESHOLD) {
+                        // Swiped left → skip to next
+                        Animated.timing(panX, {
+                            toValue: -SCREEN_WIDTH,
+                            duration: 200,
+                            useNativeDriver: true,
+                        }).start(() => {
+                            skipNext();
+                            panX.setValue(0);
+                        });
+                    } else if (gestureState.dx > HORIZONTAL_THRESHOLD) {
+                        // Swiped right → skip to previous
+                        Animated.timing(panX, {
+                            toValue: SCREEN_WIDTH,
+                            duration: 200,
+                            useNativeDriver: true,
+                        }).start(() => {
+                            skipPrevious();
+                            panX.setValue(0);
+                        });
+                    } else {
+                        // Snap back
+                        Animated.spring(panX, {
+                            toValue: 0,
+                            useNativeDriver: true,
+                            tension: 100,
+                            friction: 10,
+                        }).start();
                     }
+                } else {
+                    if (gestureState.dy > SWIPE_THRESHOLD) {
+                        // Swipe was far enough - collapse
+                        if (onCollapse) {
+                            onCollapse();
+                        } else if (navigation) {
+                            navigation.goBack();
+                        }
+                    }
+                    // Reset vertical position
+                    Animated.spring(panY, {
+                        toValue: 0,
+                        useNativeDriver: true,
+                        tension: 100,
+                        friction: 10,
+                    }).start();
                 }
-                // Reset position
-                Animated.spring(panY, {
-                    toValue: 0,
-                    useNativeDriver: true,
-                    tension: 100,
-                    friction: 10,
-                }).start();
+                isSwipingHorizontal.current = false;
             },
         })
     ).current;
@@ -130,22 +231,37 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                         </View>
                     </View>
 
-                    {/* Album Artwork - Tap for lyrics, long-press for art edit */}
+                    {/* Album Artwork - Animated entrance + crossfade + swipe to skip */}
                     <TouchableOpacity
                         style={styles.artworkContainer}
                         activeOpacity={0.9}
                         onLongPress={() => {/* TODO: Open album art editor */ }}
                     >
-                        {currentTrack.albumArt ? (
-                            <Image
-                                source={{ uri: currentTrack.albumArt }}
-                                style={styles.artwork}
-                            />
-                        ) : (
-                            <View style={[styles.artworkPlaceholder, { backgroundColor: colors.surface }]}>
-                                <Icon name="music-note" size={100} color={colors.textTertiary} />
-                            </View>
-                        )}
+                        <Animated.View style={{
+                            transform: [
+                                { scale: artworkScale },
+                                { translateX: panX },
+                            ],
+                            opacity: Animated.add(
+                                artworkOpacity,
+                                panX.interpolate({
+                                    inputRange: [-SCREEN_WIDTH, 0, SCREEN_WIDTH],
+                                    outputRange: [-0.5, 0, -0.5],
+                                    extrapolate: 'clamp',
+                                })
+                            ),
+                        }}>
+                            {currentTrack.albumArt ? (
+                                <Image
+                                    source={{ uri: currentTrack.albumArt }}
+                                    style={styles.artwork}
+                                />
+                            ) : (
+                                <View style={[styles.artworkPlaceholder, { backgroundColor: colors.surface }]}>
+                                    <Icon name="music-note" size={100} color={colors.textTertiary} />
+                                </View>
+                            )}
+                        </Animated.View>
                     </TouchableOpacity>
 
                     {/* Track Info */}
@@ -159,8 +275,13 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                                     {currentTrack.artist}
                                 </Text>
                             </View>
-                            <TouchableOpacity style={styles.favoriteButton}>
-                                <Icon name="heart-outline" size={24} color={colors.textPrimary} />
+                            <TouchableOpacity
+                                style={styles.favoriteButton}
+                                onPress={handleFavoritePress}
+                            >
+                                <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+                                    <Icon name="heart-outline" size={24} color={colors.textPrimary} />
+                                </Animated.View>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -194,7 +315,7 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.powerButton}>
-                            <Icon name="tag-edit-outline" size={22} color={colors.textSecondary} />
+                            <Icon name="tag-multiple" size={22} color={colors.textSecondary} />
                             <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Tags</Text>
                         </TouchableOpacity>
                     </View>

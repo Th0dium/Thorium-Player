@@ -1,10 +1,10 @@
-This setup phase is the most critical part of the "clean-room" build. Musicolet’s onboarding is famously fast because it doesn't wait for the user to "learn" the app—it lets the user define the app during the first 60 seconds.
+This setup phase is the most critical part of the "clean-room" build. Thorium Player’s onboarding is famously fast because it doesn't wait for the user to "learn" the app—it lets the user define the app during the first 60 seconds.
 
 Here is the expanded, high-detail setup blueprint for your project.
 
 Module: The Onboarding & Setup Framework
 Phase 1: The "Identity" Handshake (Privacy & Permissions)
-Musicolet establishes its "No-Internet" identity immediately to build trust.
+Thorium Player establishes its "No-Internet" identity immediately to build trust.
 
 Splash/Intro Screen.
 
@@ -27,7 +27,7 @@ Background Indexing: The scan must run as a Foreground Service with a progress b
 
 After file confirmation, start detect and profiling music files.
 Phase 3: Basic UI Preferences (Defining the UX)
-Musicolet lets users choose their navigation style before they even see the home screen.
+Thorium Player lets users choose their navigation style before they even see the home screen.
 
 Category Selector: A checklist of tabs the user wants to see in their horizontal top bar.
 
@@ -58,7 +58,7 @@ Logic: Every time the app starts, it checks for new files in the "Whitelisted Fo
 
 
 1. Core UI Architecture & Navigation
-Musicolet uses a "Flat Information Architecture" designed to minimize "click-depth."
+Thorium Player uses a "Flat Information Architecture" designed to minimize "click-depth."
 
 Horizontal Main Tabs: A scrollable row at the top containing all library categories.
 
@@ -94,7 +94,7 @@ shuffle_state (On/Off)
 Switching Logic: Changing from Queue 1 to Queue 2 does not clear Queue 1. It "pauses" the state so the user can return to the exact millisecond later.
 
 3. Module: Library & File Management
-Musicolet treats the file system as the "Source of Truth," not just a database.
+Thorium Player treats the file system as the "Source of Truth," not just a database.
 
 Folder View Types:
 

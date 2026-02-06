@@ -1,24 +1,34 @@
 // Queue Screen - View and manage current playback queue with Multi-Queue support
-// Musicolet-style: Queue switcher (20 queues), per-queue shuffle/repeat state, drag reorder
+// Musicolet-style: Queue switcher as list, per-queue name from source, drag reorder
 import React, { useState, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
-    FlatList,
     TouchableOpacity,
     StyleSheet,
     Modal,
     Dimensions,
+    FlatList,
+    TextInput,
+    Alert,
+    Platform,
+    StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import EmptyState from '@/components/EmptyState';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
-import { Track } from '@/types';
+import { useToast } from '@/components/Toast';
+import TrackListItem from '@/components/TrackListItem';
+import { Track, Queue } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface QueueScreenProps {
     searchQuery?: string;
@@ -27,19 +37,23 @@ interface QueueScreenProps {
 
 const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchActive = false }) => {
     const { colors } = useTheme();
-    const {
-        queues,
-        currentQueue,
-        currentIndex,
-        activeQueueIndex,
-        removeFromQueue,
-        clearQueue,
-        switchQueue,
-    } = useQueueStore();
-    const { currentTrack, skipToIndex, repeatMode, shuffleMode } = usePlayerStore();
-    const { tracks } = useLibraryStore();
+    const { showToast } = useToast();
+    const insets = useSafeAreaInsets();
+    
+    const queues = useQueueStore(state => state.queues);
+    const currentQueue = useQueueStore(state => state.currentQueue);
+    const currentIndex = useQueueStore(state => state.currentIndex);
+    const activeQueueIndex = useQueueStore(state => state.activeQueueIndex);
+    const removeFromQueue = useQueueStore(state => state.removeFromQueue);
+    const clearQueue = useQueueStore(state => state.clearQueue);
+    const switchQueue = useQueueStore(state => state.switchQueue);
+    const moveInQueue = useQueueStore(state => state.moveInQueue);
+    const skipToIndex = usePlayerStore(state => state.skipToIndex);
+    const tracks = useLibraryStore(state => state.tracks);
 
     const [showQueueSwitcher, setShowQueueSwitcher] = useState(false);
+    const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
+    const [editingName, setEditingName] = useState('');
 
     // Get tracks from current queue
     const queueTracks = useMemo(() => {
@@ -59,236 +73,390 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         );
     }, [queueTracks, searchQuery, isSearchActive]);
 
-    const handleTrackPress = useCallback(async (index: number) => {
-        if (isSearchActive && searchQuery) {
-            const track = filteredTracks[index];
-            const actualIndex = queueTracks.findIndex(t => t.id === track.id);
-            await skipToIndex(actualIndex);
-        } else {
-            await skipToIndex(index);
-        }
-    }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks]);
-
-    const handleRemoveTrack = useCallback(async (index: number) => {
-        await removeFromQueue(index);
-    }, [removeFromQueue]);
-
     const handleSwitchQueue = useCallback((index: number) => {
         switchQueue(index);
         setShowQueueSwitcher(false);
     }, [switchQueue]);
 
-    const renderQueueItem = useCallback(({ item, index }: { item: Track; index: number }) => {
-        const actualIndex = isSearchActive ? queueTracks.findIndex(t => t.id === item.id) : index;
-        const isPlaying = actualIndex === currentIndex;
-        const isPast = actualIndex < currentIndex;
+    // Start editing a queue name
+    const handleStartRename = useCallback((index: number, e?: any) => {
+        e?.stopPropagation();
+        const queue = queues[index];
+        setEditingQueueIndex(index);
+        setEditingName(queue?.name || queue?.source?.name || `Queue ${index + 1}`);
+    }, [queues]);
+
+    // Save renamed queue
+    const handleSaveRename = useCallback(() => {
+        if (editingQueueIndex === null) return;
+        const queue = queues[editingQueueIndex];
+        if (queue && editingName.trim()) {
+            // Update queue name in store
+            const updatedQueue = { ...queue, name: editingName.trim() };
+            useQueueStore.setState(state => {
+                const newQueues = [...state.queues];
+                newQueues[editingQueueIndex] = updatedQueue;
+                return {
+                    queues: newQueues,
+                    currentQueue: state.currentQueue?.id === queue.id ? updatedQueue : state.currentQueue,
+                };
+            });
+        }
+        setEditingQueueIndex(null);
+        setEditingName('');
+    }, [editingQueueIndex, editingName, queues]);
+
+    // Remove a single queue
+    const handleRemoveQueue = useCallback((index: number, e?: any) => {
+        e?.stopPropagation();
+        const queue = queues[index];
+        if (!queue) return;
+
+        const { deleteQueue: deleteQueueAction, switchQueue: switchQueueAction } = useQueueStore.getState();
+
+        // If deleting the active queue, fallback to the last available queue
+        if (index === activeQueueIndex) {
+            const remainingQueues = queues.filter((_, i) => i !== index);
+            if (remainingQueues.length > 0) {
+                // Switch to the last remaining queue
+                const newActiveIndex = Math.min(index, remainingQueues.length - 1);
+                switchQueueAction(newActiveIndex);
+            }
+        }
+
+        deleteQueueAction(queue.id);
+        showToast('Queue removed', 'info');
+    }, [queues, activeQueueIndex, showToast]);
+
+    // Remove all queues except the active one
+    const handleRemoveAllOtherQueues = useCallback(() => {
+        const queuesToRemove = queues
+            .map((q, i) => ({ queue: q, index: i }))
+            .filter(({ index }) => index !== activeQueueIndex);
+
+        if (queuesToRemove.length === 0) return;
+
+        Alert.alert(
+            'Remove all other queues?',
+            `This will delete ${queuesToRemove.length} other queue${queuesToRemove.length > 1 ? 's' : ''}.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Remove', style: 'destructive', onPress: () => {
+                        const { deleteQueue: deleteQueueAction } = useQueueStore.getState();
+                        queuesToRemove.forEach(({ queue }) => {
+                            deleteQueueAction(queue.id);
+                        });
+                        showToast(`Removed ${queuesToRemove.length} queue${queuesToRemove.length > 1 ? 's' : ''}`, 'info');
+                    }
+                },
+            ]
+        );
+    }, [queues, activeQueueIndex]);
+
+    // Get display name for a queue
+    const getQueueDisplayName = useCallback((queue: Queue, index: number): string => {
+        if (!queue || queue.trackIds.length === 0) return '';
+        return queue.name || queue.source?.name || `Queue ${index + 1}`;
+    }, []);
+
+    // Get queues that have tracks (non-empty)
+    const nonEmptyQueues = useMemo(() => {
+        return queues.filter(q => q.trackIds.length > 0);
+    }, [queues]);
+
+    const handleDragEnd = useCallback(({ data, from, to }: { data: Track[]; from: number; to: number }) => {
+        if (from !== to) {
+            moveInQueue(from, to);
+        }
+    }, [moveInQueue]);
+
+    const handleTrackPress = useCallback((index: number) => {
+        // Optimistically update the queue index for instant highlight
+        useQueueStore.getState().updateCurrentIndex(index);
+        skipToIndex(index);
+    }, [skipToIndex]);
+
+    const renderQueueItem = useCallback(({ item, drag, getIndex, isActive: isDragging }: RenderItemParams<Track>) => {
+        const index = getIndex();
+        if (index === undefined) return null;
+
+        const isPlaying = index === currentIndex;
+        const isPast = index < currentIndex;
+
+        return (
+            <View style={isDragging ? {
+                elevation: 8,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                transform: [{ scale: 1.03 }],
+                zIndex: 999,
+                borderRadius: 8,
+                opacity: 0.95,
+            } : undefined}>
+                <TrackListItem
+                    track={item}
+                    index={index}
+                    isPlaying={isPlaying}
+                    isPast={isPast}
+                    showIndex={true}
+                    showArtwork={true}
+                    showDragHandle={true}
+                    showRemoveButton={true}
+                    drag={drag}
+                    onPress={() => handleTrackPress(index)}
+                    onRemove={() => removeFromQueue(index)}
+                />
+            </View>
+        );
+    }, [currentIndex, handleTrackPress, removeFromQueue]);
+
+    // --- Render Queue Switcher Modal Item ---
+    const renderQueueSwitcherItem = ({ item: queue, index }: { item: Queue, index: number }) => {
+        const isActive = index === activeQueueIndex;
+        const hasContent = queue.trackIds.length > 0;
+        const isEditing = editingQueueIndex === index;
+        const trackCount = queue.trackIds.length;
+
+        // Calculate total duration for this queue (hooks can't be used here)
+        const queueTracksForDuration = queue.trackIds
+            .map(id => tracks.find(t => t.id === id))
+            .filter((t): t is Track => t !== undefined);
+        const queueDuration = formatTotalDuration(queueTracksForDuration);
+
+        // Skip empty queues
+        if (!hasContent) return null;
 
         return (
             <TouchableOpacity
                 style={[
-                    styles.queueItem,
-                    { backgroundColor: colors.surface },
-                    isPlaying && [styles.queueItemPlaying, { backgroundColor: colors.primary + '20', borderLeftColor: colors.primary }],
-                    isPast && styles.queueItemPast,
+                    styles.bsItem,
+                    isActive && { backgroundColor: colors.surfaceVariant + '40' }
                 ]}
-                onPress={() => handleTrackPress(index)}
+                onPress={() => handleSwitchQueue(index)}
                 activeOpacity={0.7}
             >
-                {/* Drag Handle */}
-                <TouchableOpacity style={styles.dragHandle}>
-                    <Icon name="drag-horizontal-variant" size={20} color={colors.textTertiary} />
-                </TouchableOpacity>
+                {/* Icon / Numbering */}
+                <View style={[
+                    styles.bsIconContainer,
+                    isActive && { backgroundColor: colors.primary + '20' }
+                ]}>
+                    <Text style={[
+                        styles.bsNumber,
+                        { color: isActive ? colors.primary : colors.textSecondary }
+                    ]}>
+                        {index + 1}
+                    </Text>
+                </View>
 
-                {/* Index/Playing indicator */}
-                <View style={styles.queueIndex}>
-                    {isPlaying ? (
-                        <Icon name="volume-high" size={20} color={colors.primary} />
+                {/* Content */}
+                <View style={styles.bsContent}>
+                    {isEditing ? (
+                        <TextInput
+                            style={[styles.bsInput, { color: colors.textPrimary, borderBottomColor: colors.primary }]}
+                            value={editingName}
+                            onChangeText={setEditingName}
+                            onBlur={handleSaveRename}
+                            onSubmitEditing={handleSaveRename}
+                            autoFocus
+                            selectTextOnFocus
+                            placeholder="Queue Name"
+                            placeholderTextColor={colors.textTertiary}
+                        />
                     ) : (
-                        <Text style={[styles.indexText, { color: colors.textSecondary }, isPast && { color: colors.textTertiary }]}>
-                            {actualIndex + 1}
+                        <Text style={[
+                            styles.bsTitle,
+                            { color: isActive ? colors.primary : colors.textPrimary }
+                        ]} numberOfLines={1}>
+                            {getQueueDisplayName(queue, index)}
                         </Text>
                     )}
-                </View>
-
-                {/* Track Info */}
-                <View style={styles.trackInfo}>
-                    <Text
-                        style={[
-                            styles.trackTitle,
-                            { color: colors.textPrimary },
-                            isPlaying && { color: colors.primary },
-                            isPast && { color: colors.textSecondary },
-                        ]}
-                        numberOfLines={1}
-                    >
-                        {item.title}
-                    </Text>
-                    <Text
-                        style={[styles.trackArtist, { color: colors.textSecondary }, isPast && { color: colors.textTertiary }]}
-                        numberOfLines={1}
-                    >
-                        {item.artist} • {formatDuration(item.duration)}
-                    </Text>
-                </View>
-
-                {/* Remove Button */}
-                <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => handleRemoveTrack(actualIndex)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                    <Icon name="close" size={18} color={colors.textTertiary} />
-                </TouchableOpacity>
-            </TouchableOpacity>
-        );
-    }, [colors, currentIndex, isSearchActive, queueTracks, handleTrackPress, handleRemoveTrack]);
-
-    const upNextCount = queueTracks.length - currentIndex - 1;
-
-    return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Queue Header */}
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Queue</Text>
-
-                    {/* Queue Switcher Button */}
-                    <TouchableOpacity
-                        style={[styles.queueSwitcherButton, { backgroundColor: colors.surface }]}
-                        onPress={() => setShowQueueSwitcher(true)}
-                    >
-                        <Text style={[styles.queueSwitcherText, { color: colors.textPrimary }]}>
-                            {activeQueueIndex + 1}/{queues.length}
+                    <View style={styles.bsSubtitleContainer}>
+                        <Text style={[styles.bsSubtitle, { color: colors.textSecondary }]}>
+                            {trackCount} {trackCount === 1 ? 'song' : 'songs'}
                         </Text>
-                        <Icon name="chevron-down" size={16} color={colors.textSecondary} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Header Actions */}
-                <View style={styles.headerActions}>
-                    {queueTracks.length > 0 && (
-                        <TouchableOpacity style={styles.headerButton} onPress={clearQueue}>
-                            <Icon name="playlist-remove" size={22} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            </View>
-
-            {/* Queue Stats Bar */}
-            {currentQueue && queueTracks.length > 0 && (
-                <View style={[styles.statsBar, { backgroundColor: colors.surface }]}>
-                    <View style={styles.statsLeft}>
-                        <Text style={[styles.queueName, { color: colors.textPrimary }]}>
-                            {currentQueue.name || 'Now Playing'}
-                        </Text>
-                        <Text style={[styles.queueStats, { color: colors.textSecondary }]}>
-                            {queueTracks.length} songs • {upNextCount > 0 ? `${upNextCount} up next` : 'Last song'}
+                        <View style={[styles.bsDot, { backgroundColor: colors.textTertiary }]} />
+                        <Text style={[styles.bsSubtitle, { color: colors.textSecondary }]}>
+                            {queueDuration}
                         </Text>
                     </View>
-                    <View style={styles.statsRight}>
-                        <View style={[styles.stateBadge, shuffleMode !== 'off' && { backgroundColor: colors.primary + '30' }]}>
-                            <Icon
-                                name="shuffle-variant"
-                                size={16}
-                                color={shuffleMode !== 'off' ? colors.primary : colors.textTertiary}
-                            />
-                        </View>
-                        <View style={[styles.stateBadge, repeatMode !== 'off' && { backgroundColor: colors.primary + '30' }]}>
-                            <Icon
-                                name={repeatMode === 'one' ? 'repeat-once' : 'repeat'}
-                                size={16}
-                                color={repeatMode !== 'off' ? colors.primary : colors.textTertiary}
-                            />
-                        </View>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.bsActions}>
+                    {!isEditing && (
+                        <TouchableOpacity
+                            style={styles.bsActionButton}
+                            onPress={(e) => handleStartRename(index, e)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Icon name="pencil-outline" size={20} color={colors.textSecondary} />
+                        </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                        style={[styles.bsActionButton, { marginLeft: 4 }]}
+                        onPress={(e) => handleRemoveQueue(index, e)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Icon name="close" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                </View>
+            </TouchableOpacity>
+        );
+    };
+
+    return (
+        <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
+            {/* Queue Header */}
+            <View style={styles.header}>
+                <TouchableOpacity
+                    style={[styles.queueSwitcherButton, { backgroundColor: colors.surface }]}
+                    onPress={() => setShowQueueSwitcher(true)}
+                >
+                    <Icon name="playlist-music" size={20} color={colors.primary} />
+                    <Text style={[styles.headerTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {currentQueue && activeQueueIndex >= 0
+                            ? `${activeQueueIndex + 1}. ${getQueueDisplayName(currentQueue, activeQueueIndex)}`
+                            : 'No Queue'}
+                    </Text>
+                    <Icon name="chevron-down" size={20} color={colors.textSecondary} />
+                    <TouchableOpacity
+                        style={styles.closeQueueSwitcher}
+                        onPress={clearQueue}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Icon name="close" size={20} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </View>
+
+            {/* Queue Info Bar */}
+            {currentQueue && queueTracks.length > 0 && (
+                <View style={styles.infoBar}>
+                    <View style={styles.infoLeft}>
+                        <Icon name="play-circle-outline" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                            {currentIndex + 1} / {queueTracks.length}
+                        </Text>
+                    </View>
+                    <View style={styles.infoRight}>
+                        <Icon name="clock-outline" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+                            {formatTotalDuration(queueTracks)}
+                        </Text>
                     </View>
                 </View>
             )}
 
             {/* Queue List */}
             {queueTracks.length > 0 ? (
-                <FlatList
+                <DraggableFlatList
                     data={filteredTracks}
                     keyExtractor={(item, index) => `${item.id}-${index}`}
                     renderItem={renderQueueItem}
-                    contentContainerStyle={styles.listContent}
-                    initialNumToRender={15}
-                    maxToRenderPerBatch={10}
-                    windowSize={5}
+                    onDragEnd={handleDragEnd}
+                    containerStyle={styles.listContent}
                     showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 120 }} 
                 />
             ) : (
-                <View style={styles.emptyContainer}>
-                    <Icon name="playlist-play" size={64} color={colors.textTertiary} />
-                    <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Queue is empty</Text>
-                    <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-                        Play some music to see your queue here
-                    </Text>
-                </View>
+                <EmptyState
+                    icon="playlist-play"
+                    title="Queue is empty"
+                    subtitle="Play some music to see your queue here"
+                />
             )}
 
-            {/* Queue Switcher Modal */}
+            {/* NEW Queue Switcher - Bottom Sheet Style */}
             <Modal
                 visible={showQueueSwitcher}
                 transparent
-                animationType="fade"
-                onRequestClose={() => setShowQueueSwitcher(false)}
+                animationType="slide"
+                onRequestClose={() => {
+                    setShowQueueSwitcher(false);
+                    setEditingQueueIndex(null);
+                }}
             >
                 <TouchableOpacity
                     style={styles.modalOverlay}
                     activeOpacity={1}
-                    onPress={() => setShowQueueSwitcher(false)}
+                    onPress={() => {
+                        setShowQueueSwitcher(false);
+                        setEditingQueueIndex(null);
+                    }}
                 >
-                    <View style={[styles.queueSwitcherModal, { backgroundColor: colors.surfaceElevated }]}>
-                        <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
-                            Switch Queue
-                        </Text>
-                        <View style={styles.queueGrid}>
-                            {queues.map((queue, index) => (
-                                <TouchableOpacity
-                                    key={queue.id}
-                                    style={[
-                                        styles.queueGridItem,
-                                        { backgroundColor: colors.surface },
-                                        index === activeQueueIndex && {
-                                            backgroundColor: colors.primary + '20',
-                                            borderColor: colors.primary,
-                                            borderWidth: 2,
-                                        },
-                                    ]}
-                                    onPress={() => handleSwitchQueue(index)}
-                                >
-                                    <Text style={[
-                                        styles.queueGridNumber,
-                                        { color: index === activeQueueIndex ? colors.primary : colors.textPrimary }
-                                    ]}>
-                                        {index + 1}
+                    <View
+                        style={[
+                            styles.bottomSheetModal, 
+                            { 
+                                backgroundColor: colors.surfaceElevated,
+                                paddingBottom: insets.bottom + 20 
+                            }
+                        ]}
+                        onStartShouldSetResponder={() => true}
+                    >
+                        {/* Drag Indicator */}
+                        <View style={styles.bsHandleContainer}>
+                            <View style={[styles.bsHandle, { backgroundColor: colors.surfaceVariant }]} />
+                        </View>
+
+                        {/* Header */}
+                        <View style={styles.bsHeader}>
+                            <Text style={[styles.bsHeaderTitle, { color: colors.textPrimary }]}>
+                                Your Queues
+                            </Text>
+                            {/* Option to create new queue could go here, but kept simple for now */}
+                        </View>
+
+                        {/* List */}
+                        <FlatList
+                            data={queues}
+                            keyExtractor={(item, index) => `queue-${index}`}
+                            renderItem={renderQueueSwitcherItem}
+                            contentContainerStyle={styles.bsListContent}
+                            ListEmptyComponent={
+                                <View style={styles.emptyQueueList}>
+                                    <Text style={[styles.emptyQueueText, { color: colors.textSecondary }]}>
+                                        No active queues.
                                     </Text>
-                                    <Text
-                                        style={[styles.queueGridName, { color: colors.textSecondary }]}
-                                        numberOfLines={1}
-                                    >
-                                        {queue.trackIds.length > 0 ? `${queue.trackIds.length} songs` : 'Empty'}
+                                </View>
+                            }
+                        />
+
+                        {/* Footer Actions */}
+                        {nonEmptyQueues.length > 1 && (
+                            <View style={[styles.bsFooter, { borderTopColor: colors.border }]}>
+                                <TouchableOpacity
+                                    style={styles.bsDestructiveButton}
+                                    onPress={handleRemoveAllOtherQueues}
+                                >
+                                    <Icon name="delete-sweep-outline" size={20} color={colors.error || '#F44336'} />
+                                    <Text style={[styles.bsDestructiveText, { color: colors.error || '#F44336' }]}>
+                                        Clear Other Queues
                                     </Text>
                                 </TouchableOpacity>
-                            ))}
-                        </View>
-                        <TouchableOpacity
-                            style={[styles.modalCloseButton, { backgroundColor: colors.surface }]}
-                            onPress={() => setShowQueueSwitcher(false)}
-                        >
-                            <Text style={[styles.modalCloseText, { color: colors.textPrimary }]}>Close</Text>
-                        </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 </TouchableOpacity>
             </Modal>
-        </View>
+        </GestureHandlerRootView>
     );
 };
 
-const formatDuration = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+// Format total duration of queue tracks
+const formatTotalDuration = (tracks: Track[]): string => {
+    const totalSeconds = tracks.reduce((sum, t) => sum + (t.duration || 0), 0);
+    const hours = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = Math.floor(totalSeconds % 60);
+    
+    if (hours > 0) {
+        return `${hours}h ${mins}m`;
+    }
+    return `${mins}m ${secs}s`;
 };
 
 const styles = StyleSheet.create({
@@ -296,178 +464,172 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.md,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: typography.sizes.xl,
-        fontWeight: typography.weights.bold,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
     },
     queueSwitcherButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginLeft: spacing.md,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.sm,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.md,
+        gap: spacing.sm,
     },
-    queueSwitcherText: {
-        fontSize: typography.sizes.sm,
-        fontWeight: typography.weights.medium,
-        marginRight: spacing.xs,
-    },
-    headerActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    headerButton: {
-        padding: spacing.sm,
-    },
-    statsBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginHorizontal: spacing.lg,
-        marginBottom: spacing.md,
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-    },
-    statsLeft: {
+    headerTitle: {
         flex: 1,
-    },
-    queueName: {
         fontSize: typography.sizes.md,
         fontWeight: typography.weights.semibold,
     },
-    queueStats: {
-        fontSize: typography.sizes.sm,
-        marginTop: 2,
+    closeQueueSwitcher: {
+        padding: spacing.xs,
     },
-    statsRight: {
+    infoBar: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.sm,
     },
-    stateBadge: {
-        padding: spacing.xs,
-        borderRadius: borderRadius.sm,
+    infoLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: spacing.xl,
+    },
+    infoRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    infoText: {
+        fontSize: typography.sizes.sm,
         marginLeft: spacing.xs,
+        fontWeight: typography.weights.medium,
     },
     listContent: {
-        paddingHorizontal: spacing.lg,
-        paddingBottom: 100,
+        paddingHorizontal: spacing.sm,
     },
-    queueItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: borderRadius.md,
-        padding: spacing.sm,
-        marginBottom: spacing.xs,
-    },
-    queueItemPlaying: {
-        borderLeftWidth: 3,
-    },
-    queueItemPast: {
-        opacity: 0.5,
-    },
-    dragHandle: {
-        padding: spacing.xs,
-        marginRight: spacing.xs,
-    },
-    queueIndex: {
-        width: 28,
-        alignItems: 'center',
-        marginRight: spacing.sm,
-    },
-    indexText: {
-        fontSize: typography.sizes.sm,
-        fontWeight: typography.weights.medium,
-    },
-    trackInfo: {
-        flex: 1,
-        marginRight: spacing.sm,
-    },
-    trackTitle: {
-        fontSize: typography.sizes.md,
-        fontWeight: typography.weights.medium,
-    },
-    trackArtist: {
-        fontSize: typography.sizes.sm,
-        marginTop: 2,
-    },
-    removeButton: {
-        padding: spacing.sm,
-    },
-    emptyContainer: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: spacing.xl,
-    },
-    emptyTitle: {
-        fontSize: typography.sizes.xl,
-        fontWeight: typography.weights.semibold,
-        marginTop: spacing.lg,
-    },
-    emptySubtitle: {
-        fontSize: typography.sizes.md,
-        textAlign: 'center',
-        marginTop: spacing.sm,
-    },
+    // Modal / Bottom Sheet Styles
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        justifyContent: 'center',
-        alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end', // Aligns to bottom
     },
-    queueSwitcherModal: {
-        width: SCREEN_WIDTH - 48,
+    bottomSheetModal: {
+        width: '100%',
         maxHeight: '70%',
-        borderRadius: borderRadius.xl,
-        padding: spacing.lg,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: -4,
+        },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        elevation: 10,
     },
-    modalTitle: {
-        fontSize: typography.sizes.lg,
+    bsHandleContainer: {
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    bsHandle: {
+        width: 40,
+        height: 4,
+        borderRadius: 2,
+    },
+    bsHeader: {
+        paddingHorizontal: spacing.xl,
+        paddingBottom: spacing.md,
+    },
+    bsHeaderTitle: {
+        fontSize: typography.sizes.xl,
         fontWeight: typography.weights.bold,
-        marginBottom: spacing.lg,
-        textAlign: 'center',
     },
-    queueGrid: {
+    bsListContent: {
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+    },
+    // Bottom Sheet Item
+    bsItem: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.md,
+        marginBottom: spacing.xs,
+        borderRadius: borderRadius.lg,
     },
-    queueGridItem: {
-        width: '23%',
-        aspectRatio: 1,
-        borderRadius: borderRadius.md,
+    bsIconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: spacing.sm,
+        marginRight: spacing.md,
+        backgroundColor: 'rgba(0,0,0,0.03)',
     },
-    queueGridNumber: {
-        fontSize: typography.sizes.lg,
+    bsNumber: {
+        fontSize: typography.sizes.md,
         fontWeight: typography.weights.bold,
     },
-    queueGridName: {
-        fontSize: typography.sizes.xs,
-        marginTop: 2,
+    bsContent: {
+        flex: 1,
+        justifyContent: 'center',
     },
-    modalCloseButton: {
-        marginTop: spacing.md,
-        padding: spacing.md,
-        borderRadius: borderRadius.md,
+    bsTitle: {
+        fontSize: typography.sizes.md,
+        fontWeight: typography.weights.semibold,
+        marginBottom: 2,
+    },
+    bsSubtitleContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
     },
-    modalCloseText: {
+    bsSubtitle: {
+        fontSize: typography.sizes.sm,
+    },
+    bsDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        marginHorizontal: spacing.xs,
+        opacity: 0.5,
+    },
+    bsInput: {
         fontSize: typography.sizes.md,
-        fontWeight: typography.weights.medium,
+        fontWeight: typography.weights.semibold,
+        padding: 0,
+        borderBottomWidth: 1.5,
+        marginBottom: 2,
+    },
+    bsActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    bsActionButton: {
+        padding: spacing.xs,
+    },
+    // Footer
+    bsFooter: {
+        paddingHorizontal: spacing.xl,
+        paddingTop: spacing.md,
+        borderTopWidth: 1,
+    },
+    bsDestructiveButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: spacing.sm,
+        gap: spacing.xs,
+    },
+    bsDestructiveText: {
+        fontSize: typography.sizes.md,
+        fontWeight: typography.weights.semibold,
+    },
+    emptyQueueList: {
+        paddingVertical: spacing.xl,
+        alignItems: 'center',
+    },
+    emptyQueueText: {
+        fontSize: typography.sizes.md,
     },
 });
 

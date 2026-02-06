@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, StatusBar } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Navigation from '@/navigation/Navigation';
 import OnboardingNavigator, { checkOnboardingComplete } from '@/navigation/OnboardingNavigator';
 import { usePlayerStore } from '@/store/playerStore';
@@ -14,6 +15,7 @@ import { aiPlaylistService } from '@/services/AIPlaylistService';
 import { audioFocusService } from '@/services/AudioFocusService';
 import { audioService } from '@/services/AudioService';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { ToastProvider } from '@/components/Toast';
 import { colors, typography } from '@/constants/theme';
 
 const App: React.FC = () => {
@@ -156,10 +158,14 @@ const App: React.FC = () => {
 
     return (
         <GestureHandlerRootView style={styles.container}>
-            <ThemeProvider>
-                <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-                <Navigation />
-            </ThemeProvider>
+            <SafeAreaProvider>
+                <ThemeProvider>
+                    <ToastProvider>
+                        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+                        <Navigation />
+                    </ToastProvider>
+                </ThemeProvider>
+            </SafeAreaProvider>
         </GestureHandlerRootView>
     );
 };

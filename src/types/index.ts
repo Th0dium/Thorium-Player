@@ -140,7 +140,7 @@ export interface Queue {
 }
 
 export interface QueueSource {
-    type: 'folder' | 'album' | 'artist' | 'playlist' | 'all' | 'search' | 'ai' | 'genre';
+    type: 'folder' | 'album' | 'artist' | 'playlist' | 'all' | 'search' | 'ai' | 'genre' | 'custom';
     id?: string;
     name: string;
 }

@@ -1,5 +1,5 @@
 // Folder Browser - Component for selecting folders manually
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -60,10 +60,10 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({
         setIsLoading(false);
     };
 
-    const handleFolderPress = (folderPath: string) => {
+    const handleFolderPress = useCallback((folderPath: string) => {
         setPath(folderPath);
-        setPathHistory([...pathHistory, folderPath]);
-    };
+        setPathHistory(prev => [...prev, folderPath]);
+    }, []);
 
     const handleBack = () => {
         if (pathHistory.length > 1) {
@@ -77,6 +77,17 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({
     const handleSelectCurrentFolder = () => {
         onSelectFolder(path);
     };
+
+    const renderFolderItem = useCallback(({ item }: { item: FolderItem }) => (
+        <TouchableOpacity
+            style={styles.folderItem}
+            onPress={() => handleFolderPress(item.path)}
+        >
+            <Icon name="folder" size={24} color={colors.primary} />
+            <Text style={styles.folderName}>{item.name}</Text>
+            <Icon name="chevron-right" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+    ), [colors, handleFolderPress]);
 
     const canGoBack = pathHistory.length > 1;
     const pathParts = path.split('/').filter(p => p);
@@ -145,17 +156,9 @@ const FolderBrowser: React.FC<FolderBrowserProps> = ({
                 <FlatList
                     data={items}
                     keyExtractor={item => item.path}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.folderItem}
-                            onPress={() => handleFolderPress(item.path)}
-                        >
-                            <Icon name="folder" size={24} color={colors.primary} />
-                            <Text style={styles.folderName}>{item.name}</Text>
-                            <Icon name="chevron-right" size={20} color={colors.textSecondary} />
-                        </TouchableOpacity>
-                    )}
+                    renderItem={renderFolderItem}
                     contentContainerStyle={styles.listContent}
+                    removeClippedSubviews={true}
                 />
             ) : (
                 <View style={styles.emptyContainer}>

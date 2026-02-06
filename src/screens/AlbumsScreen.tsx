@@ -12,6 +12,7 @@ import {
     RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
 import { Album } from '@/types';
@@ -35,7 +36,9 @@ const AlbumsScreen: React.FC<AlbumsScreenProps> = ({ searchQuery = '', onAlbumPr
     const [sortAsc, setSortAsc] = useState(true);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-    const { albums, isScanning, scanForMusic } = useLibraryStore();
+    const albums = useLibraryStore(state => state.albums);
+    const isScanning = useLibraryStore(state => state.isScanning);
+    const scanForMusic = useLibraryStore(state => state.scanForMusic);
 
     // Filter and sort albums
     const filteredAndSortedAlbums = useMemo(() => {
@@ -150,7 +153,7 @@ const AlbumsScreen: React.FC<AlbumsScreenProps> = ({ searchQuery = '', onAlbumPr
         </TouchableOpacity>
     );
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
         <View style={styles.container}>
@@ -206,15 +209,11 @@ const AlbumsScreen: React.FC<AlbumsScreenProps> = ({ searchQuery = '', onAlbumPr
                     viewMode === 'grid' && styles.gridContent
                 ]}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="album" size={64} color={colors.textTertiary} />
-                        <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'No albums found' : 'No albums yet'}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            {!searchQuery && 'Scan your music library to find albums'}
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="album"
+                        title={searchQuery ? 'No albums found' : 'No albums yet'}
+                        subtitle={!searchQuery ? 'Scan your music library to find albums' : undefined}
+                    />
                 }
             />
         </View>

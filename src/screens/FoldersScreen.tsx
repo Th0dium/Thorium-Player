@@ -10,6 +10,7 @@ import {
     RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
@@ -31,9 +32,14 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
     const { colors } = useTheme();
     const [currentPath, setCurrentPath] = useState<string[]>([]);
 
-    const { folders, tracks, isScanning, scanForMusic } = useLibraryStore();
-    const { createQueue, addToQueue } = useQueueStore();
-    const { currentTrack, isPlaying } = usePlayerStore();
+    const folders = useLibraryStore(state => state.folders);
+    const tracks = useLibraryStore(state => state.tracks);
+    const isScanning = useLibraryStore(state => state.isScanning);
+    const scanForMusic = useLibraryStore(state => state.scanForMusic);
+    const createQueue = useQueueStore(state => state.createQueue);
+    const addToQueue = useQueueStore(state => state.addToQueue);
+    const currentTrack = usePlayerStore(state => state.currentTrack);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
 
     // Get current folder contents
     const currentContents = useMemo(() => {
@@ -177,7 +183,7 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
         }
     };
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
         <View style={styles.container}>
@@ -254,15 +260,11 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
                 }
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="folder-open" size={64} color={colors.textTertiary} />
-                        <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'No items found' : 'Folder is empty'}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            {!searchQuery && currentPath.length === 0 && 'Scan your device to find music folders'}
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="folder-open"
+                        title={searchQuery ? 'No items found' : 'Folder is empty'}
+                        subtitle={!searchQuery && currentPath.length === 0 ? 'Scan your device to find music folders' : undefined}
+                    />
                 }
             />
         </View>

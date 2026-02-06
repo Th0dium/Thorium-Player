@@ -10,7 +10,8 @@ import {
     ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { colors, spacing, typography, borderRadius } from '@/constants/theme';
+import { spacing, typography, borderRadius } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
 import { useSettingsStore, ALL_TABS, TabId, ThemeOption, FolderViewOption } from '@/store/settingsStore';
 
 interface UIPreferencesScreenProps {
@@ -19,6 +20,7 @@ interface UIPreferencesScreenProps {
 }
 
 const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBack }) => {
+    const { colors } = useTheme();
     const {
         selectedTabs,
         theme,
@@ -57,7 +59,7 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
             <StatusBar barStyle="light-content" />
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Header */}
@@ -67,25 +69,25 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
 
                 {/* Progress indicator */}
                 <View style={styles.progressContainer}>
-                    <View style={[styles.progressDot, styles.progressDotActive]} />
-                    <View style={[styles.progressDot, styles.progressDotActive]} />
-                    <View style={[styles.progressDot, styles.progressDotActive]} />
-                    <View style={[styles.progressDot, styles.progressDotActive]} />
+                    <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
+                    <View style={[styles.progressDot, { backgroundColor: colors.primary }]} />
                 </View>
 
                 {/* Title */}
-                <Text style={styles.title}>Customize Your Experience</Text>
-                <Text style={styles.description}>
+                <Text style={[styles.title, { color: colors.text }]}>Customize Your Experience</Text>
+                <Text style={[styles.description, { color: colors.textSecondary }]}>
                     Make Thorium feel like your own
                 </Text>
 
                 {/* Tab Manager */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Navigation Tabs</Text>
-                    <Text style={styles.sectionDescription}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Navigation Tabs</Text>
+                    <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
                         Choose 2-5 tabs for your bottom navigation
                     </Text>
-                    <Text style={styles.tabCount}>
+                    <Text style={[styles.tabCount, { color: colors.primary }]}>
                         {selectedTabs.length} of 5 selected
                     </Text>
 
@@ -95,7 +97,11 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
                                 key={tab.id}
                                 style={[
                                     styles.tabOption,
-                                    selectedTabs.includes(tab.id) && styles.tabOptionActive
+                                    { backgroundColor: colors.surface },
+                                    selectedTabs.includes(tab.id) && {
+                                        borderColor: colors.primary,
+                                        backgroundColor: colors.primary + '10'
+                                    }
                                 ]}
                                 onPress={() => toggleTab(tab.id)}
                             >
@@ -106,12 +112,12 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
                                 />
                                 <Text style={[
                                     styles.tabLabel,
-                                    selectedTabs.includes(tab.id) && styles.tabLabelActive
+                                    { color: selectedTabs.includes(tab.id) ? colors.text : colors.textSecondary }
                                 ]}>
                                     {tab.label}
                                 </Text>
                                 {selectedTabs.includes(tab.id) && (
-                                    <View style={styles.tabCheck}>
+                                    <View style={[styles.tabCheck, { backgroundColor: colors.primary }]}>
                                         <Icon name="check" size={12} color={colors.background} />
                                     </View>
                                 )}
@@ -122,14 +128,18 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
 
                 {/* Folder View */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Folder View Style</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Folder View Style</Text>
                     <View style={styles.folderViewOptions}>
                         {folderViews.map(view => (
                             <TouchableOpacity
                                 key={view.id}
                                 style={[
                                     styles.folderViewOption,
-                                    folderView === view.id && styles.folderViewOptionActive
+                                    { backgroundColor: colors.surface },
+                                    folderView === view.id && {
+                                        borderColor: colors.primary,
+                                        backgroundColor: colors.primary + '10'
+                                    }
                                 ]}
                                 onPress={() => setFolderView(view.id as FolderViewOption)}
                             >
@@ -140,11 +150,11 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
                                 />
                                 <Text style={[
                                     styles.folderViewLabel,
-                                    folderView === view.id && styles.folderViewLabelActive
+                                    { color: folderView === view.id ? colors.text : colors.textSecondary }
                                 ]}>
                                     {view.label}
                                 </Text>
-                                <Text style={styles.folderViewDescription}>
+                                <Text style={[styles.folderViewDescription, { color: colors.textMuted }]}>
                                     {view.description}
                                 </Text>
                             </TouchableOpacity>
@@ -154,14 +164,18 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
 
                 {/* Theme Selection */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>App Theme</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>App Theme</Text>
                     <View style={styles.themeOptions}>
                         {themes.map(t => (
                             <TouchableOpacity
                                 key={t.id}
                                 style={[
                                     styles.themeOption,
-                                    theme === t.id && styles.themeOptionActive
+                                    { backgroundColor: colors.surface },
+                                    theme === t.id && {
+                                        borderColor: colors.primary,
+                                        backgroundColor: colors.primary + '10'
+                                    }
                                 ]}
                                 onPress={() => setTheme(t.id as ThemeOption)}
                             >
@@ -172,7 +186,7 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
                                 />
                                 <Text style={[
                                     styles.themeLabel,
-                                    theme === t.id && styles.themeLabelActive
+                                    { color: theme === t.id ? colors.text : colors.textSecondary }
                                 ]}>
                                     {t.label}
                                 </Text>
@@ -184,7 +198,7 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
                 {/* Preview note */}
                 <View style={styles.previewNote}>
                     <Icon name="information" size={16} color={colors.textMuted} />
-                    <Text style={styles.previewNoteText}>
+                    <Text style={[styles.previewNoteText, { color: colors.textMuted }]}>
                         These settings can be changed anytime in Settings
                     </Text>
                 </View>
@@ -192,8 +206,11 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
 
             {/* Footer */}
             <View style={styles.footer}>
-                <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
-                    <Text style={styles.continueButtonText}>Almost Done!</Text>
+                <TouchableOpacity
+                    style={[styles.continueButton, { backgroundColor: colors.primary }]}
+                    onPress={handleContinue}
+                >
+                    <Text style={[styles.continueButtonText, { color: colors.background }]}>Almost Done!</Text>
                     <Icon name="arrow-right" size={20} color={colors.background} />
                 </TouchableOpacity>
             </View>
@@ -204,7 +221,6 @@ const UIPreferencesScreen: React.FC<UIPreferencesScreenProps> = ({ onNext, onBac
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
     },
     content: {
         flex: 1,
@@ -225,22 +241,16 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: colors.surface,
         marginHorizontal: spacing.xs,
-    },
-    progressDotActive: {
-        backgroundColor: colors.primary,
     },
     title: {
         fontSize: typography.sizes.xxl,
         fontWeight: typography.weights.bold,
-        color: colors.text,
         textAlign: 'center',
         marginBottom: spacing.sm,
     },
     description: {
         fontSize: typography.sizes.md,
-        color: colors.textSecondary,
         textAlign: 'center',
         marginBottom: spacing.xl,
     },
@@ -250,48 +260,36 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: typography.sizes.lg,
         fontWeight: typography.weights.semibold,
-        color: colors.text,
         marginBottom: spacing.xs,
     },
     sectionDescription: {
         fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
         marginBottom: spacing.sm,
     },
     tabCount: {
         fontSize: typography.sizes.xs,
-        color: colors.primary,
         marginBottom: spacing.md,
     },
     tabsGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm,
+        marginHorizontal: -spacing.xs,
     },
     tabOption: {
-        backgroundColor: colors.surface,
         borderRadius: borderRadius.md,
         padding: spacing.md,
         alignItems: 'center',
-        minWidth: '30%',
-        flex: 1,
-        maxWidth: '32%',
+        width: '31%',
+        marginHorizontal: spacing.xs,
+        marginBottom: spacing.sm,
         position: 'relative',
         borderWidth: 2,
         borderColor: 'transparent',
     },
-    tabOptionActive: {
-        borderColor: colors.primary,
-        backgroundColor: colors.primary + '10',
-    },
     tabLabel: {
         fontSize: typography.sizes.xs,
-        color: colors.textSecondary,
         marginTop: spacing.xs,
         textAlign: 'center',
-    },
-    tabLabelActive: {
-        color: colors.text,
     },
     tabCheck: {
         position: 'absolute',
@@ -300,66 +298,48 @@ const styles = StyleSheet.create({
         width: 18,
         height: 18,
         borderRadius: 9,
-        backgroundColor: colors.primary,
         alignItems: 'center',
         justifyContent: 'center',
     },
     folderViewOptions: {
         flexDirection: 'row',
-        gap: spacing.md,
+        marginHorizontal: -spacing.xs,
     },
     folderViewOption: {
         flex: 1,
-        backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         padding: spacing.lg,
         alignItems: 'center',
         borderWidth: 2,
         borderColor: 'transparent',
-    },
-    folderViewOptionActive: {
-        borderColor: colors.primary,
-        backgroundColor: colors.primary + '10',
+        marginHorizontal: spacing.xs,
     },
     folderViewLabel: {
         fontSize: typography.sizes.md,
         fontWeight: typography.weights.medium,
-        color: colors.textSecondary,
         marginTop: spacing.sm,
-    },
-    folderViewLabelActive: {
-        color: colors.text,
     },
     folderViewDescription: {
         fontSize: typography.sizes.xs,
-        color: colors.textMuted,
         marginTop: spacing.xs,
         textAlign: 'center',
     },
     themeOptions: {
         flexDirection: 'row',
-        gap: spacing.md,
+        marginHorizontal: -spacing.xs,
     },
     themeOption: {
         flex: 1,
-        backgroundColor: colors.surface,
         borderRadius: borderRadius.md,
         padding: spacing.lg,
         alignItems: 'center',
         borderWidth: 2,
         borderColor: 'transparent',
-    },
-    themeOptionActive: {
-        borderColor: colors.primary,
-        backgroundColor: colors.primary + '10',
+        marginHorizontal: spacing.xs,
     },
     themeLabel: {
         fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
         marginTop: spacing.sm,
-    },
-    themeLabelActive: {
-        color: colors.text,
     },
     previewNote: {
         flexDirection: 'row',
@@ -369,7 +349,6 @@ const styles = StyleSheet.create({
     },
     previewNoteText: {
         fontSize: typography.sizes.xs,
-        color: colors.textMuted,
         marginLeft: spacing.xs,
     },
     footer: {
@@ -377,7 +356,6 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.xxl,
     },
     continueButton: {
-        backgroundColor: colors.primary,
         borderRadius: borderRadius.full,
         paddingVertical: spacing.lg,
         paddingHorizontal: spacing.xl,
@@ -388,7 +366,6 @@ const styles = StyleSheet.create({
     continueButtonText: {
         fontSize: typography.sizes.lg,
         fontWeight: typography.weights.semibold,
-        color: colors.background,
         marginRight: spacing.sm,
     },
 });

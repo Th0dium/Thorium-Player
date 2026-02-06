@@ -3,6 +3,8 @@
         "/^cd /mnt/c/Dev/Thorium-player && node --version && npm --version$/": {
             "approve": true,
             "matchCommandLine": true
-        }
+        },
+        "npm search": true,
+        "npm install": true
     }
 }

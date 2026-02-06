@@ -1,6 +1,6 @@
 // Playlists Screen - User playlist management
 // Create, edit, reorder playlists with Musicolet-style UI
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -13,6 +13,7 @@ import {
     Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { useTheme } from '@/context/ThemeContext';
@@ -29,8 +30,10 @@ const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onP
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState('');
 
-    const { playlists, createPlaylist, deletePlaylist } = useLibraryStore();
-    const { createQueue } = useQueueStore();
+    const playlists = useLibraryStore(state => state.playlists);
+    const createPlaylist = useLibraryStore(state => state.createPlaylist);
+    const deletePlaylist = useLibraryStore(state => state.deletePlaylist);
+    const createQueue = useQueueStore(state => state.createQueue);
 
     // Filter playlists
     const filteredPlaylists = searchQuery.trim()
@@ -142,7 +145,7 @@ const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onP
         );
     };
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
         <View style={styles.container}>
@@ -165,22 +168,14 @@ const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onP
                 renderItem={renderPlaylistItem}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="playlist-music" size={64} color={colors.textTertiary} />
-                        <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'No playlists found' : 'No playlists yet'}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            Create a playlist to organize your music
-                        </Text>
-                        <TouchableOpacity
-                            style={[styles.emptyCreateButton, { backgroundColor: colors.primary }]}
-                            onPress={() => setShowCreateModal(true)}
-                        >
-                            <Icon name="plus" size={20} color="#FFF" />
-                            <Text style={styles.emptyCreateButtonText}>Create Playlist</Text>
-                        </TouchableOpacity>
-                    </View>
+                    <EmptyState
+                        icon="playlist-music"
+                        title={searchQuery ? 'No playlists found' : 'No playlists yet'}
+                        subtitle="Create a playlist to organize your music"
+                        actionLabel="Create Playlist"
+                        actionIcon="plus"
+                        onAction={() => setShowCreateModal(true)}
+                    />
                 }
             />
 
@@ -188,7 +183,7 @@ const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onP
             <Modal
                 visible={showCreateModal}
                 transparent
-                animationType="fade"
+                animationType="slide"
                 onRequestClose={() => setShowCreateModal(false)}
             >
                 <View style={styles.modalOverlay}>

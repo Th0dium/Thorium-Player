@@ -31,7 +31,8 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const Navigation: React.FC = () => {
-    const { loadSettings, isLoaded } = useSettingsStore();
+    const loadSettings = useSettingsStore(state => state.loadSettings);
+    const isLoaded = useSettingsStore(state => state.isLoaded);
     const { colors, isDark } = useTheme();
 
     useEffect(() => {

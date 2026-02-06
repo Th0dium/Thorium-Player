@@ -2,6 +2,8 @@
 import TrackPlayer, { Event } from 'react-native-track-player';
 import { useSettingsStore } from '@/store/settingsStore';
 import { usePlayerStore } from '@/store/playerStore';
+import { useQueueStore } from '@/store/queueStore';
+import { useLibraryStore } from '@/store/libraryStore';
 
 // Track if we were playing before audio becoming noisy
 let wasPlayingBeforeNoisy = false;
@@ -68,18 +70,44 @@ module.exports = async function () {
         console.log('Queue ended', event);
     });
 
-    // Handle track change - update player store
+    // Handle track change - sync player store and queue store with TrackPlayer
     TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, async (event) => {
-        if (event.track) {
-            console.log('[PlaybackService] Track changed:', event.track.title);
-            // Sync with player store if available
+        if (event.track && event.index !== undefined) {
+            console.log('[PlaybackService] Track changed:', event.track.title, 'index:', event.index);
             try {
-                const setCurrentTrack = usePlayerStore.getState().setCurrentTrack;
-                // Note: We'd need to convert TPTrack back to our Track type
-                // This is handled elsewhere in the app flow
+                // Update queue store's current index
+                const queueState = useQueueStore.getState();
+                if (queueState.currentQueue) {
+                    queueState.updateCurrentIndex(event.index);
+
+                    // Find the full track object from the library
+                    const trackId = queueState.currentQueue.trackIds[event.index];
+                    if (trackId) {
+                        const libraryTracks = useLibraryStore.getState().tracks;
+                        const fullTrack = libraryTracks.find(t => t.id === trackId);
+                        if (fullTrack) {
+                            usePlayerStore.getState().setCurrentTrack(fullTrack);
+                        }
+                    }
+                }
             } catch (e) {
-                // Store might not be available
+                console.warn('[PlaybackService] Error syncing track change:', e);
             }
+        }
+    });
+
+    // Handle playback state changes - sync isPlaying to playerStore
+    TrackPlayer.addEventListener(Event.PlaybackState, (event) => {
+        try {
+            const isPlaying = event.state === 'playing';
+            const isPaused = event.state === 'paused' || event.state === 'stopped' || event.state === 'none';
+            if (isPlaying) {
+                usePlayerStore.getState().setIsPlaying(true);
+            } else if (isPaused) {
+                usePlayerStore.getState().setIsPlaying(false);
+            }
+        } catch (e) {
+            // Store might not be available
         }
     });
 

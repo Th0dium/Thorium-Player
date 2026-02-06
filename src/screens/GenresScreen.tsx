@@ -9,6 +9,7 @@ import {
     RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { useTheme } from '@/context/ThemeContext';
@@ -23,8 +24,10 @@ interface GenresScreenProps {
 const GenresScreen: React.FC<GenresScreenProps> = ({ searchQuery = '', onGenrePress }) => {
     const { colors } = useTheme();
 
-    const { genres, isScanning, scanForMusic } = useLibraryStore();
-    const { createQueue } = useQueueStore();
+    const genres = useLibraryStore(state => state.genres);
+    const isScanning = useLibraryStore(state => state.isScanning);
+    const scanForMusic = useLibraryStore(state => state.scanForMusic);
+    const createQueue = useQueueStore(state => state.createQueue);
 
     // Filter genres
     const filteredGenres = useMemo(() => {
@@ -123,7 +126,7 @@ const GenresScreen: React.FC<GenresScreenProps> = ({ searchQuery = '', onGenrePr
         );
     };
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
         <View style={styles.container}>
@@ -147,15 +150,11 @@ const GenresScreen: React.FC<GenresScreenProps> = ({ searchQuery = '', onGenrePr
                 }
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="music-circle" size={64} color={colors.textTertiary} />
-                        <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'No genres found' : 'No genres yet'}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            Genre tags are read from your music file metadata
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="music-circle"
+                        title={searchQuery ? 'No genres found' : 'No genres yet'}
+                        subtitle="Genre tags are read from your music file metadata"
+                    />
                 }
             />
         </View>

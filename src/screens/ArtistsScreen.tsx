@@ -10,6 +10,7 @@ import {
     RefreshControl,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
 import { Artist } from '@/types';
@@ -28,7 +29,9 @@ const ArtistsScreen: React.FC<ArtistsScreenProps> = ({ searchQuery = '', onArtis
     const [sortBy, setSortBy] = useState<SortOption>('name');
     const flatListRef = React.useRef<FlatList>(null);
 
-    const { artists, isScanning, scanForMusic } = useLibraryStore();
+    const artists = useLibraryStore(state => state.artists);
+    const isScanning = useLibraryStore(state => state.isScanning);
+    const scanForMusic = useLibraryStore(state => state.scanForMusic);
 
     // Filter and sort artists
     const filteredAndSortedArtists = useMemo(() => {
@@ -141,7 +144,7 @@ const ArtistsScreen: React.FC<ArtistsScreenProps> = ({ searchQuery = '', onArtis
         </TouchableOpacity>
     );
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
         <View style={styles.container}>
@@ -185,15 +188,11 @@ const ArtistsScreen: React.FC<ArtistsScreenProps> = ({ searchQuery = '', onArtis
                     }, 500);
                 }}
                 ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="account-music" size={64} color={colors.textTertiary} />
-                        <Text style={styles.emptyTitle}>
-                            {searchQuery ? 'No artists found' : 'No artists yet'}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            {!searchQuery && 'Scan your music library to find artists'}
-                        </Text>
-                    </View>
+                    <EmptyState
+                        icon="account-music"
+                        title={searchQuery ? 'No artists found' : 'No artists yet'}
+                        subtitle={!searchQuery ? 'Scan your music library to find artists' : undefined}
+                    />
                 }
             />
 

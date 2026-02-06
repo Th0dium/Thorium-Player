@@ -21,6 +21,10 @@ const darkColors = {
     backgroundTertiary: '#252525',
     surface: '#1E1E1E',
     surfaceElevated: '#2A2A2A',
+    surfaceVariant: '#303030',
+
+    // Border colors
+    border: '#333333',
 
     // Text colors
     text: '#FFFFFF',
@@ -66,6 +70,10 @@ const lightColors = {
     backgroundTertiary: '#EEEEEE',
     surface: '#FFFFFF',
     surfaceElevated: '#FFFFFF',
+    surfaceVariant: '#E0E0E0',
+
+    // Border colors
+    border: '#E0E0E0',
 
     // Text colors
     text: '#000000',

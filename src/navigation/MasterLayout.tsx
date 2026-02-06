@@ -2,24 +2,32 @@
 // Zone A: Navigation Header (Top tabs)
 // Zone B: Dynamic Content Area
 // Zone C: Persistent Mini-Player
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     Dimensions,
     TouchableOpacity,
-    ScrollView,
     Animated,
     StatusBar,
     TextInput,
+    LayoutAnimation,
+    UIManager,
+    Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 // Screens
 import NowPlayingScreen from '@/screens/NowPlayingScreen';
 import QueueScreen from '@/screens/QueueScreen';
+import LibraryScreen from '@/screens/LibraryScreen';
+import SongsListScreen, { FilterType } from '@/screens/SongsListScreen';
 import FoldersScreen from '@/screens/FoldersScreen';
 import AlbumsScreen from '@/screens/AlbumsScreen';
 import ArtistsScreen from '@/screens/ArtistsScreen';
@@ -29,9 +37,10 @@ import SongsScreen from '@/screens/SongsScreen';
 
 // Components
 import MiniPlayer from '@/components/MiniPlayer';
+import AppMenu from '@/components/AppMenu';
 
 // Stores & Theme
-import { useSettingsStore, TabId, ALL_TABS } from '@/store/settingsStore';
+import { useSettingsStore, TabId, MAIN_TABS } from '@/store/settingsStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useTheme } from '@/context/ThemeContext';
 import { spacing, typography, borderRadius } from '@/constants/theme';
@@ -43,40 +52,72 @@ const TAB_BAR_HEIGHT = 48;
 const MasterLayout: React.FC = () => {
     const insets = useSafeAreaInsets();
     const { colors } = useTheme();
-    const { selectedTabs } = useSettingsStore();
-    const { currentTrack } = usePlayerStore();
+    const selectedTabs = useSettingsStore(state => state.selectedTabs);
+    // Only subscribe to whether there's a track, not the track object itself
+    // This prevents re-renders when track metadata updates
+    const hasCurrentTrack = usePlayerStore(state => state.currentTrack !== null);
 
-    const [activeTab, setActiveTab] = useState<TabId>(selectedTabs[0] || 'nowPlaying');
+    const [activeTab, setActiveTab] = useState<TabId>('library');
     const [isNowPlayingExpanded, setIsNowPlayingExpanded] = useState(false);
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isMenuVisible, setIsMenuVisible] = useState(false);
 
-    const tabScrollRef = useRef<ScrollView>(null);
+    // Library sub-navigation state
+    const [librarySubScreen, setLibrarySubScreen] = useState<string | null>(null);
+    const [librarySubTitle, setLibrarySubTitle] = useState<string>('');
+
     const nowPlayingAnim = useRef(new Animated.Value(0)).current;
+    const contentFade = useRef(new Animated.Value(1)).current;
 
-    // Get visible tabs configuration
-    const visibleTabs = useMemo(() => {
-        return ALL_TABS.filter(tab => selectedTabs.includes(tab.id));
-    }, [selectedTabs]);
+    // Use main tabs (Queue, Playing, Library)
+    const visibleTabs = MAIN_TABS;
 
-    // Check if we need compact mode (icons only)
-    const useCompactTabs = visibleTabs.length > 5;
-
-    // Handle tab press
+    // Handle tab press with content fade animation
     const handleTabPress = useCallback((tabId: TabId) => {
-        setActiveTab(tabId);
-        setSearchQuery('');
-        setIsSearchVisible(false);
+        if (tabId === activeTab) return;
+        // Fade out, switch, fade in
+        Animated.timing(contentFade, {
+            toValue: 0,
+            duration: 80,
+            useNativeDriver: true,
+        }).start(() => {
+            setActiveTab(tabId);
+            setSearchQuery('');
+            setIsSearchVisible(false);
+            if (tabId !== 'library') {
+                setLibrarySubScreen(null);
+                setLibrarySubTitle('');
+            }
+            Animated.timing(contentFade, {
+                toValue: 1,
+                duration: 150,
+                useNativeDriver: true,
+            }).start();
+        });
+    }, [activeTab, contentFade]);
+
+    // Handle library navigation
+    const handleLibraryNavigate = useCallback((screenId: string, params?: { title?: string }) => {
+        setLibrarySubScreen(screenId);
+        setLibrarySubTitle(params?.title || '');
+    }, []);
+
+    // Handle back from library sub-screen
+    const handleLibraryBack = useCallback(() => {
+        setLibrarySubScreen(null);
+        setLibrarySubTitle('');
     }, []);
 
     // Handle mini-player press - expand to full Now Playing
     const handleMiniPlayerPress = useCallback(() => {
         setIsNowPlayingExpanded(true);
+        nowPlayingAnim.setValue(0);
         Animated.spring(nowPlayingAnim, {
             toValue: 1,
             useNativeDriver: true,
-            tension: 80,
-            friction: 12,
+            tension: 65,
+            friction: 11,
         }).start();
     }, [nowPlayingAnim]);
 
@@ -84,15 +125,16 @@ const MasterLayout: React.FC = () => {
     const handleNowPlayingCollapse = useCallback(() => {
         Animated.timing(nowPlayingAnim, {
             toValue: 0,
-            duration: 250,
+            duration: 200,
             useNativeDriver: true,
         }).start(() => {
             setIsNowPlayingExpanded(false);
         });
     }, [nowPlayingAnim]);
 
-    // Toggle search visibility
+    // Toggle search visibility with animation
     const handleSearchToggle = useCallback(() => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setIsSearchVisible(prev => !prev);
         if (isSearchVisible) {
             setSearchQuery('');
@@ -114,6 +156,47 @@ const MasterLayout: React.FC = () => {
         switch (activeTab) {
             case 'queue':
                 return <QueueScreen {...screenProps} />;
+            case 'library':
+                // Check if we're in a sub-screen
+                if (librarySubScreen) {
+                    // Handle category screens
+                    const categoryFilters: Record<string, FilterType> = {
+                        'all-songs': 'all-songs',
+                        'favorites': 'favorites',
+                        'recently-added': 'recently-added',
+                        'recently-played': 'recently-played',
+                        'most-played': 'most-played',
+                        'not-played': 'not-played',
+                    };
+
+                    if (categoryFilters[librarySubScreen]) {
+                        return (
+                            <SongsListScreen
+                                filter={categoryFilters[librarySubScreen]}
+                                title={librarySubTitle}
+                                searchQuery={searchQuery}
+                                isSearchActive={isSearchVisible && searchQuery.length > 0}
+                                onBack={handleLibraryBack}
+                            />
+                        );
+                    }
+
+                    // Handle playlist screens
+                    if (librarySubScreen.startsWith('playlist-')) {
+                        return (
+                            <SongsListScreen
+                                filter="playlist"
+                                playlistId={librarySubScreen.replace('playlist-', '')}
+                                title={librarySubTitle}
+                                searchQuery={searchQuery}
+                                isSearchActive={isSearchVisible && searchQuery.length > 0}
+                                onBack={handleLibraryBack}
+                            />
+                        );
+                    }
+                }
+                // Show library menu
+                return <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />;
             case 'folders':
                 return <FoldersScreen {...screenProps} />;
             case 'albums':
@@ -127,12 +210,12 @@ const MasterLayout: React.FC = () => {
             case 'songs':
                 return <SongsScreen {...screenProps} />;
             default:
-                return <SongsScreen {...screenProps} />;
+                return <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />;
         }
     };
 
     // Calculate mini-player visibility
-    const showMiniPlayer = currentTrack && activeTab !== 'nowPlaying';
+    const showMiniPlayer = hasCurrentTrack && activeTab !== 'nowPlaying';
 
     // Animated styles for full-screen Now Playing overlay
     const nowPlayingTranslateY = nowPlayingAnim.interpolate({
@@ -147,14 +230,8 @@ const MasterLayout: React.FC = () => {
             {/* Zone A: Navigation Header */}
             <SafeAreaView edges={['top']} style={[styles.header, { backgroundColor: colors.background }]}>
                 <View style={styles.headerContent}>
-                    {/* Tab Bar */}
-                    <ScrollView
-                        ref={tabScrollRef}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={styles.tabBar}
-                        contentContainerStyle={styles.tabBarContent}
-                    >
+                    {/* Tab Bar - Left side */}
+                    <View style={styles.tabBar}>
                         {visibleTabs.map((tab) => {
                             const isActive = activeTab === tab.id;
                             return (
@@ -162,7 +239,6 @@ const MasterLayout: React.FC = () => {
                                     key={tab.id}
                                     style={[
                                         styles.tab,
-                                        useCompactTabs && styles.tabCompact,
                                         isActive && [styles.tabActive, { borderBottomColor: colors.primary }],
                                     ]}
                                     onPress={() => handleTabPress(tab.id)}
@@ -170,39 +246,35 @@ const MasterLayout: React.FC = () => {
                                 >
                                     <Icon
                                         name={tab.icon}
-                                        size={useCompactTabs ? 22 : 18}
+                                        size={22}
                                         color={isActive ? colors.primary : colors.textSecondary}
                                     />
-                                    {!useCompactTabs && (
-                                        <Text
-                                            style={[
-                                                styles.tabLabel,
-                                                { color: isActive ? colors.primary : colors.textSecondary },
-                                                isActive && styles.tabLabelActive,
-                                            ]}
-                                        >
-                                            {tab.label}
-                                        </Text>
-                                    )}
                                 </TouchableOpacity>
                             );
                         })}
-                    </ScrollView>
+                    </View>
 
-                    {/* Header Actions */}
+                    {/* Header Actions - Right side */}
                     <View style={styles.headerActions}>
                         <TouchableOpacity
                             style={styles.headerButton}
                             onPress={handleSearchToggle}
                         >
                             <Icon
-                                name={isSearchVisible ? 'close' : 'magnify'}
+                                name="magnify"
                                 size={22}
                                 color={colors.textPrimary}
                             />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.headerButton}>
-                            <Icon name="dots-vertical" size={22} color={colors.textPrimary} />
+                        <TouchableOpacity
+                            style={styles.headerButton}
+                            onPress={() => setIsMenuVisible(true)}
+                        >
+                            <Icon
+                                name="dots-vertical"
+                                size={22}
+                                color={colors.textPrimary}
+                            />
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -229,12 +301,15 @@ const MasterLayout: React.FC = () => {
             </SafeAreaView>
 
             {/* Zone B: Dynamic Content Area */}
-            <View style={[
+            <Animated.View style={[
                 styles.content,
-                { paddingBottom: showMiniPlayer ? MINI_PLAYER_HEIGHT : 0 }
+                {
+                    paddingBottom: showMiniPlayer ? MINI_PLAYER_HEIGHT : 0,
+                    opacity: contentFade,
+                }
             ]}>
                 {renderContent()}
-            </View>
+            </Animated.View>
 
             {/* Zone C: Persistent Mini-Player */}
             {showMiniPlayer && (
@@ -265,6 +340,12 @@ const MasterLayout: React.FC = () => {
                     />
                 </Animated.View>
             )}
+
+            {/* App Menu */}
+            <AppMenu
+                visible={isMenuVisible}
+                onClose={() => setIsMenuVisible(false)}
+            />
         </View>
     );
 };
@@ -280,42 +361,28 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         height: TAB_BAR_HEIGHT,
+        paddingHorizontal: spacing.sm,
     },
     tabBar: {
         flex: 1,
-    },
-    tabBarContent: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.sm,
+        justifyContent: 'flex-start',
     },
     tab: {
-        flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.md,
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xl,
         paddingVertical: spacing.sm,
-        marginRight: spacing.xs,
         borderBottomWidth: 2,
         borderBottomColor: 'transparent',
-    },
-    tabCompact: {
-        paddingHorizontal: spacing.md,
     },
     tabActive: {
         borderBottomWidth: 2,
     },
-    tabLabel: {
-        fontSize: typography.sizes.sm,
-        fontWeight: typography.weights.medium,
-        marginLeft: spacing.xs,
-    },
-    tabLabelActive: {
-        fontWeight: typography.weights.semibold,
-    },
     headerActions: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingRight: spacing.sm,
     },
     headerButton: {
         padding: spacing.sm,

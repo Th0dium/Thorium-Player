@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SETTINGS_STORAGE_KEY = '@thorium/ui_settings';
 
-export type TabId = 'nowPlaying' | 'queue' | 'folders' | 'albums' | 'artists' | 'playlists' | 'genres' | 'songs';
+export type TabId = 'queue' | 'nowPlaying' | 'library' | 'folders' | 'albums' | 'artists' | 'playlists' | 'genres' | 'songs';
 export type ThemeOption = 'dark' | 'light' | 'system';
 export type FolderViewOption = 'linear' | 'hierarchical';
 export type QueueBehavior = 'addToEnd' | 'playNext' | 'clearAndPlay';
@@ -15,9 +15,18 @@ export interface TabConfig {
     icon: string;
 }
 
+// Main navigation tabs (shown in top bar)
+export const MAIN_TABS: TabConfig[] = [
+    { id: 'queue', label: 'Queue', icon: 'playlist-play' },
+    { id: 'nowPlaying', label: 'Playing', icon: 'play-circle' },
+    { id: 'library', label: 'Library', icon: 'music-box-multiple' },
+];
+
+// All available tabs (for customization)
 export const ALL_TABS: TabConfig[] = [
-    { id: 'nowPlaying', label: 'Player', icon: 'play-circle' },
-    { id: 'queue', label: 'Queues', icon: 'playlist-play' },
+    { id: 'queue', label: 'Queue', icon: 'playlist-play' },
+    { id: 'nowPlaying', label: 'Playing', icon: 'play-circle' },
+    { id: 'library', label: 'Library', icon: 'music-box-multiple' },
     { id: 'folders', label: 'Folders', icon: 'folder-music' },
     { id: 'albums', label: 'Albums', icon: 'album' },
     { id: 'artists', label: 'Artists', icon: 'account-music' },
@@ -69,7 +78,7 @@ interface SettingsStore extends UISettings {
 }
 
 const DEFAULT_SETTINGS: UISettings = {
-    selectedTabs: ['nowPlaying', 'queue', 'folders', 'albums', 'artists', 'playlists', 'genres', 'songs'],
+    selectedTabs: ['queue', 'nowPlaying', 'library'],
     theme: 'dark',
     folderView: 'hierarchical',
     queueBehavior: 'clearAndPlay',

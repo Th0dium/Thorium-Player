@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { Track, Album, Artist, Folder, Playlist, Genre } from '@/types';
 import { databaseService } from '@/services/DatabaseService';
 import { fileSystemService } from '@/services/FileSystemService';
+import { libraryProfilingService } from '@/services/LibraryProfilingService';
 
 interface LibraryStore {
     // State
@@ -148,41 +149,57 @@ export const useLibraryStore = create<LibraryStore>((set, get) => ({
             const scanPaths = paths || fileSystemService.getDefaultMusicPaths();
             const settings = await databaseService.getSettings();
 
+            console.log('[LibraryStore] Starting scan with paths:', scanPaths);
+
+            // Step 1: Scan filesystem for audio files (30%)
             const { tracks: scannedTracks, folders } = await fileSystemService.scanDirectories(
                 scanPaths,
                 settings.excludeFolders
             );
 
-            set({ scanProgress: 50 });
+            console.log(`[LibraryStore] Found ${scannedTracks.length} audio files`);
+            set({ scanProgress: 30 });
 
-            // Merge with existing tracks (preserve play counts, bookmarks, tags)
+            // Step 2: Profile tracks with metadata from MusicFiles API (30% -> 80%)
+            // This enriches tracks with title, artist, album, duration, artwork
+            const profiledTracks = await libraryProfilingService.profileLibrary(
+                scannedTracks as Track[],
+                (current, total) => {
+                    // Map profiling progress from 30% to 80%
+                    const progress = 30 + Math.round((current / total) * 50);
+                    set({ scanProgress: progress });
+                }
+            );
+
+            console.log(`[LibraryStore] Profiled ${profiledTracks.length} tracks`);
+            set({ scanProgress: 85 });
+
+            // Step 3: Merge with existing tracks (preserve AI tags)
             const existingTracks = await databaseService.getAllTracks();
             const existingMap = new Map(existingTracks.map(t => [t.path, t]));
 
-            const mergedTracks: Track[] = scannedTracks.map(scanned => {
-                const existing = existingMap.get(scanned.path!);
+            const mergedTracks: Track[] = profiledTracks.map(profiled => {
+                const existing = existingMap.get(profiled.path!);
                 if (existing) {
+                    // Preserve AI tags from existing track
                     return {
-                        ...existing,
-                        ...scanned,
-                        playCount: existing.playCount,
-                        lastPlayed: existing.lastPlayed,
-                        bookmarks: existing.bookmarks,
-                        aiTags: existing.aiTags,
-                        taggedAt: existing.taggedAt,
+                        ...profiled,
+                        aiTags: existing.aiTags || profiled.aiTags,
+                        taggedAt: existing.taggedAt || profiled.taggedAt,
                     } as Track;
                 }
-                return scanned as Track;
+                return profiled as Track;
             });
 
-            set({ scanProgress: 75 });
+            set({ scanProgress: 90 });
 
-            // Save to database
+            // Step 4: Save to database
             await databaseService.saveTracks(mergedTracks);
 
             set({ scanProgress: 100, folders });
+            console.log(`[LibraryStore] Saved ${mergedTracks.length} tracks to database`);
 
-            // Reload library
+            // Reload library to update UI
             await get().loadLibrary();
         } catch (error) {
             console.error('Error scanning for music:', error);

@@ -1,5 +1,5 @@
 // Statistics Screen - Display listening statistics and library insights
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -39,15 +39,11 @@ interface Stats {
 
 const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ navigation }) => {
     const { colors } = useTheme();
-    const { tracks, artists } = useLibraryStore();
+    const tracks = useLibraryStore(state => state.tracks);
     const [stats, setStats] = useState<Stats | null>(null);
     const [activeSection, setActiveSection] = useState<'overview' | 'mostPlayed' | 'recent' | 'favorites'>('overview');
 
-    useEffect(() => {
-        calculateStats();
-    }, [tracks]);
-
-    const calculateStats = async () => {
+    const calculateStats = useCallback(async () => {
         const favorites = await databaseService.getFavorites();
         const recentlyPlayed = await databaseService.getRecentlyPlayed(10);
         const mostPlayed = await databaseService.getMostPlayed(10);
@@ -107,7 +103,11 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ navigation }) => {
             topArtists,
             topGenres,
         });
-    };
+    }, [tracks]);
+
+    useEffect(() => {
+        calculateStats();
+    }, [calculateStats]);
 
     const formatTime = (seconds: number): string => {
         if (seconds < 60) return `${seconds}s`;
@@ -161,7 +161,7 @@ const StatisticsScreen: React.FC<StatisticsScreenProps> = ({ navigation }) => {
         </View>
     );
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     if (!stats) {
         return (

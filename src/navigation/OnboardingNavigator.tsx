@@ -85,7 +85,7 @@ const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({ onComplete })
                 },
                 onComplete: (results: ScanResults) => {
                     setScanResults(results);
-                    setScanProgress({ ...progress, inProgress: false });
+                    setScanProgress(prev => ({ ...prev, inProgress: false }));
                 },
                 onError: (error: Error) => {
                     console.error('Background scan error:', error);

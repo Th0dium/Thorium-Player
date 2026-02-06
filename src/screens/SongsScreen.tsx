@@ -9,7 +9,6 @@ import {
     TextInput,
     StyleSheet,
     RefreshControl,
-    Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -17,6 +16,8 @@ import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import TrackListItem from '@/components/TrackListItem';
 import AlphabetScroller from '@/components/AlphabetScroller';
+import EmptyState from '@/components/EmptyState';
+import SkeletonList from '@/components/SkeletonLoader';
 import { useTheme } from '@/context/ThemeContext';
 import { Track } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
@@ -36,16 +37,18 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '' }) => {
     const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-    const {
-        tracks,
-        isLoading,
-        isScanning,
-        loadLibrary,
-        scanForMusic,
-    } = useLibraryStore();
+    // Use individual selectors to prevent re-renders when unrelated state changes
+    const tracks = useLibraryStore(state => state.tracks);
+    const isLoading = useLibraryStore(state => state.isLoading);
+    const isScanning = useLibraryStore(state => state.isScanning);
+    const loadLibrary = useLibraryStore(state => state.loadLibrary);
+    const scanForMusic = useLibraryStore(state => state.scanForMusic);
 
-    const { createQueue, addToQueue } = useQueueStore();
-    const { currentTrack, isPlaying } = usePlayerStore();
+    const createQueue = useQueueStore(state => state.createQueue);
+    const addToQueue = useQueueStore(state => state.addToQueue);
+    // Only subscribe to the specific values we need to minimize re-renders
+    const currentTrackId = usePlayerStore(state => state.currentTrack?.id);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
 
     useEffect(() => {
         loadLibrary();
@@ -164,11 +167,29 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '' }) => {
 
     const handleAddSelectedToQueue = useCallback(async () => {
         const selectedTrackList = filteredAndSortedTracks.filter(t => selectedTracks.has(t.id));
-        for (const track of selectedTrackList) {
-            await addToQueue(track);
-        }
+        await addToQueue(selectedTrackList);
         exitSelectionMode();
     }, [filteredAndSortedTracks, selectedTracks, addToQueue, exitSelectionMode]);
+
+    const renderItem = useCallback(({ item, index }: { item: Track; index: number }) => (
+        <TrackListItem
+            track={item}
+            index={index}
+            isPlaying={currentTrackId === item.id && isPlaying}
+            isSelected={selectedTracks.has(item.id)}
+            showSelection={isSelectionMode}
+            onPress={() => handleTrackPress(item, index)}
+            onLongPress={() => handleTrackLongPress(item)}
+        />
+    ), [currentTrackId, isPlaying, selectedTracks, isSelectionMode, handleTrackPress, handleTrackLongPress]);
+
+    const keyExtractor = useCallback((item: Track) => item.id, []);
+
+    const getItemLayout = useCallback((_data: any, index: number) => ({
+        length: 64,
+        offset: 64 * index,
+        index,
+    }), []);
 
     const sortOptions: { key: SortOption; label: string; icon: string }[] = [
         { key: 'title', label: 'Title', icon: 'sort-alphabetical-ascending' },
@@ -178,7 +199,7 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '' }) => {
         { key: 'dateAdded', label: 'Date Added', icon: 'calendar' },
     ];
 
-    const styles = createStyles(colors);
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
         <View style={styles.container}>
@@ -261,50 +282,45 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '' }) => {
             )}
 
             {/* Track list */}
-            <FlatList
-                ref={flatListRef}
-                data={filteredAndSortedTracks}
-                keyExtractor={item => item.id}
-                renderItem={({ item, index }) => (
-                    <TrackListItem
-                        track={item}
-                        isPlaying={currentTrack?.id === item.id && isPlaying}
-                        isSelected={selectedTracks.has(item.id)}
-                        showSelection={isSelectionMode}
-                        onPress={() => handleTrackPress(item, index)}
-                        onLongPress={() => handleTrackLongPress(item)}
-                        onMenuPress={() => {
-                            // Show track options modal
-                        }}
-                    />
-                )}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={isScanning}
-                        onRefresh={handleRefresh}
-                        tintColor={colors.primary}
-                        colors={[colors.primary]}
-                    />
-                }
-                contentContainerStyle={styles.listContent}
-                onScrollToIndexFailed={(info) => {
-                    // Handle scroll failure gracefully
-                    setTimeout(() => {
-                        flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
-                    }, 500);
-                }}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Icon name="music-note-off" size={64} color={colors.textTertiary} />
-                        <Text style={styles.emptyTitle}>
-                            {isLoading ? 'Loading...' : searchQuery ? 'No songs found' : 'No music yet'}
-                        </Text>
-                        <Text style={styles.emptySubtitle}>
-                            {!isLoading && !searchQuery && 'Pull down to scan for music'}
-                        </Text>
-                    </View>
-                }
-            />
+            {isLoading && filteredAndSortedTracks.length === 0 ? (
+                <SkeletonList count={10} />
+            ) : (
+                <FlatList
+                    ref={flatListRef}
+                    data={filteredAndSortedTracks}
+                    keyExtractor={keyExtractor}
+                    renderItem={renderItem}
+                    // Performance optimizations for large lists
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={15}
+                    windowSize={7}
+                    removeClippedSubviews={true}
+                    updateCellsBatchingPeriod={50}
+                    getItemLayout={getItemLayout}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={isScanning}
+                            onRefresh={handleRefresh}
+                            tintColor={colors.primary}
+                            colors={[colors.primary]}
+                        />
+                    }
+                    contentContainerStyle={styles.listContent}
+                    onScrollToIndexFailed={(info) => {
+                        // Handle scroll failure gracefully
+                        setTimeout(() => {
+                            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+                        }, 500);
+                    }}
+                    ListEmptyComponent={
+                        <EmptyState
+                            icon="music-note-off"
+                            title={isLoading ? 'Loading...' : searchQuery ? 'No songs found' : 'No music yet'}
+                            subtitle={!isLoading && !searchQuery ? 'Pull down to scan for music' : undefined}
+                        />
+                    }
+                />
+            )}
 
             {/* Alphabet scroller */}
             {filteredAndSortedTracks.length > 20 && !isSelectionMode && (

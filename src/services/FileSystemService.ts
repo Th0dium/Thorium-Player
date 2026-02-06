@@ -9,6 +9,14 @@ const AUDIO_EXTENSIONS = [
     '.wma', '.opus', '.alac', '.ape', '.dsf', '.dff'
 ];
 
+/**
+ * Normalize file path - ensures consistency across the app
+ * Paths are stored WITHOUT the file:// prefix
+ */
+function normalizePath(path: string): string {
+    return path.replace(/^file:\/\//, '');
+}
+
 class FileSystemService {
     private static instance: FileSystemService;
 
@@ -84,10 +92,11 @@ class FileSystemService {
                         }
                     } else if (item.isFile && item.isFile() && this.isAudioFile(item.name)) {
                         trackCount++;
+                        const normalizedPath = normalizePath(item.path);
                         tracks.push({
-                            id: this.generateTrackId(item.path),
-                            path: item.path,
-                            url: Platform.OS === 'android' ? `file://${item.path}` : item.path,
+                            id: this.generateTrackId(normalizedPath),
+                            path: normalizedPath,
+                            url: Platform.OS === 'android' ? `file://${normalizedPath}` : normalizedPath,
                             title: this.getFilenameWithoutExtension(item.name),
                             artist: 'Unknown Artist',
                             album: 'Unknown Album',
@@ -156,14 +165,15 @@ class FileSystemService {
             for (const item of items) {
                 if (item.isDirectory()) {
                     subfolders.push({
-                        path: item.path,
+                        path: normalizePath(item.path),
                         name: item.name,
                     });
                 } else if (item.isFile() && this.isAudioFile(item.name)) {
+                    const normalizedPath = normalizePath(item.path);
                     tracks.push({
-                        id: this.generateTrackId(item.path),
-                        path: item.path,
-                        url: Platform.OS === 'android' ? `file://${item.path}` : item.path,
+                        id: this.generateTrackId(normalizedPath),
+                        path: normalizedPath,
+                        url: Platform.OS === 'android' ? `file://${normalizedPath}` : normalizedPath,
                         title: this.getFilenameWithoutExtension(item.name),
                         artist: 'Unknown Artist',
                         album: 'Unknown Album',

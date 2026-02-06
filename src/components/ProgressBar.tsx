@@ -1,15 +1,17 @@
-// Progress Bar Component - Seek bar with time display
-import React from 'react';
+// Progress Bar Component - Seek bar with time display and animated thumb
+import React, { useRef, useCallback } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     PanResponder,
     Dimensions,
+    Animated,
 } from 'react-native';
 import { useProgress } from 'react-native-track-player';
 import { usePlayerStore } from '@/store/playerStore';
-import { colors, spacing, typography, borderRadius } from '@/constants/theme';
+import { useTheme } from '@/context/ThemeContext';
+import { spacing, typography, borderRadius } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -24,15 +26,38 @@ const formatTime = (seconds: number): string => {
 };
 
 const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48 }) => {
-    const { position, duration } = useProgress();
-    const { seekTo } = usePlayerStore();
+    const { colors } = useTheme();
+    const { position, duration } = useProgress(500);
+    const seekTo = usePlayerStore(state => state.seekTo);
     const progress = duration > 0 ? position / duration : 0;
+    const thumbScale = useRef(new Animated.Value(1)).current;
+    const isSeeking = useRef(false);
+
+    const expandThumb = useCallback(() => {
+        Animated.spring(thumbScale, {
+            toValue: 1.5,
+            useNativeDriver: true,
+            speed: 50,
+            bounciness: 8,
+        }).start();
+    }, [thumbScale]);
+
+    const shrinkThumb = useCallback(() => {
+        Animated.spring(thumbScale, {
+            toValue: 1,
+            useNativeDriver: true,
+            speed: 30,
+            bounciness: 6,
+        }).start();
+    }, [thumbScale]);
 
     const panResponder = React.useMemo(
         () =>
             PanResponder.create({
                 onStartShouldSetPanResponder: () => true,
                 onPanResponderGrant: (evt) => {
+                    isSeeking.current = true;
+                    expandThumb();
                     const x = evt.nativeEvent.locationX;
                     const newProgress = Math.max(0, Math.min(1, x / width));
                     seekTo(newProgress * duration);
@@ -42,28 +67,37 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48 }) 
                     const newProgress = Math.max(0, Math.min(1, x / width));
                     seekTo(newProgress * duration);
                 },
+                onPanResponderRelease: () => {
+                    isSeeking.current = false;
+                    shrinkThumb();
+                },
             }),
-        [width, duration, seekTo]
+        [width, duration, seekTo, expandThumb, shrinkThumb]
     );
 
     return (
         <View style={styles.container}>
             <View style={styles.timeRow}>
-                <Text style={styles.time}>{formatTime(position)}</Text>
-                <Text style={styles.time}>{formatTime(duration)}</Text>
+                <Text style={[styles.time, { color: colors.textSecondary }]}>{formatTime(position)}</Text>
+                <Text style={[styles.time, { color: colors.textSecondary }]}>{formatTime(duration)}</Text>
             </View>
 
             <View
                 style={[styles.trackContainer, { width }]}
                 {...panResponder.panHandlers}
             >
-                <View style={styles.track}>
-                    <View style={[styles.progress, { width: `${progress * 100}%` }]} />
+                <View style={[styles.track, { backgroundColor: colors.seekBarBackground }]}>
+                    <View style={[styles.progress, { width: `${progress * 100}%`, backgroundColor: colors.primary }]} />
                 </View>
-                <View
+                <Animated.View
                     style={[
                         styles.thumb,
-                        { left: progress * width - 8 },
+                        {
+                            left: progress * width - 8,
+                            backgroundColor: colors.primary,
+                            shadowColor: colors.primary,
+                            transform: [{ scale: thumbScale }],
+                        },
                     ]}
                 />
             </View>
@@ -82,7 +116,6 @@ const styles = StyleSheet.create({
     },
     time: {
         fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
     },
     trackContainer: {
         height: 24,
@@ -90,13 +123,11 @@ const styles = StyleSheet.create({
     },
     track: {
         height: 4,
-        backgroundColor: colors.seekBarBackground,
         borderRadius: 2,
         overflow: 'hidden',
     },
     progress: {
         height: '100%',
-        backgroundColor: colors.primary,
         borderRadius: 2,
     },
     thumb: {
@@ -104,8 +135,6 @@ const styles = StyleSheet.create({
         width: 16,
         height: 16,
         borderRadius: 8,
-        backgroundColor: colors.primary,
-        shadowColor: colors.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.5,
         shadowRadius: 4,

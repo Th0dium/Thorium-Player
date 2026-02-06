@@ -68,47 +68,51 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     setVolume: (volume) => set({ volume }),
     setCurrentQueueId: (queueId) => set({ currentQueueId: queueId }),
 
-    // Playback actions
+    // Playback actions - Use optimistic updates (set state BEFORE async call for instant UI response)
     play: async () => {
-        await audioService.play();
-        set({ isPlaying: true });
+        set({ isPlaying: true }); // Optimistic update
+        audioService.play().catch(() => set({ isPlaying: false })); // Fire and forget with rollback on error
     },
 
     pause: async () => {
-        await audioService.pause();
-        set({ isPlaying: false });
+        set({ isPlaying: false }); // Optimistic update
+        audioService.pause().catch(() => set({ isPlaying: true })); // Fire and forget with rollback on error
     },
 
     togglePlayPause: async () => {
         const { isPlaying } = get();
-        if (isPlaying) {
-            await get().pause();
+        const newState = !isPlaying;
+        set({ isPlaying: newState }); // Optimistic update
+
+        if (newState) {
+            audioService.play().catch(() => set({ isPlaying: false }));
         } else {
-            await get().play();
+            audioService.pause().catch(() => set({ isPlaying: true }));
         }
     },
 
     seekTo: async (position) => {
-        await audioService.seekTo(position);
-        set({ position });
+        set({ position }); // Optimistic update
+        audioService.seekTo(position); // Fire and forget
     },
 
     skipNext: async () => {
-        await audioService.skipToNext();
+        audioService.skipToNext(); // Fire and forget - track change handled by event listener
     },
 
     skipPrevious: async () => {
         const { position } = get();
         // If more than 3 seconds in, restart track instead of going previous
         if (position > 3) {
-            await audioService.seekTo(0);
+            set({ position: 0 }); // Optimistic update
+            audioService.seekTo(0);
         } else {
-            await audioService.skipToPrevious();
+            audioService.skipToPrevious(); // Fire and forget - track change handled by event listener
         }
     },
 
     skipToIndex: async (index) => {
-        await audioService.skipToTrack(index);
+        audioService.skipToTrack(index); // Fire and forget - track change handled by event listener
     },
 
     toggleRepeat: async () => {
@@ -125,8 +129,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             default:
                 newMode = 'off';
         }
-        await audioService.setRepeatMode(newMode);
-        set({ repeatMode: newMode });
+        set({ repeatMode: newMode }); // Optimistic update
+        audioService.setRepeatMode(newMode); // Fire and forget
     },
 
     toggleShuffle: () => {

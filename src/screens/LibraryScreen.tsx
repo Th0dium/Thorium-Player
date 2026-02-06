@@ -1,306 +1,263 @@
-// Library Screen - Main library browser with tabs for tracks, albums, artists
-import React, { useEffect, useState } from 'react';
+// Library Screen - Musicolet-style library browser
+// Shows: All songs, Favorites, Recently added, Recently played, Most played, Not played
+// Plus user playlists section at bottom
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     View,
     Text,
+    StyleSheet,
     FlatList,
     TouchableOpacity,
     TextInput,
-    StyleSheet,
-    RefreshControl,
-    SafeAreaView,
-    StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+import { useTheme } from '@/context/ThemeContext';
 import { useLibraryStore } from '@/store/libraryStore';
-import { useQueueStore } from '@/store/queueStore';
-import { usePlayerStore } from '@/store/playerStore';
-import TrackItem from '@/components/TrackItem';
-import { Track } from '@/types';
-import { colors, spacing, typography, borderRadius } from '@/constants/theme';
+import { spacing, typography, borderRadius } from '@/constants/theme';
 
-type TabType = 'tracks' | 'albums' | 'artists' | 'folders';
-
-interface LibraryScreenProps {
-    navigation: any;
+interface LibraryItem {
+    id: string;
+    title: string;
+    icon: string;
+    type: 'category' | 'playlist' | 'section-header';
+    count?: number;
 }
 
-const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
-    const [activeTab, setActiveTab] = useState<TabType>('tracks');
-    const [isSearching, setIsSearching] = useState(false);
+interface LibraryScreenProps {
+    searchQuery?: string;
+    isSearchActive?: boolean;
+    onNavigate?: (screen: string, params?: any) => void;
+}
 
-    const {
-        tracks,
-        albums,
-        artists,
-        folders,
-        isLoading,
-        isScanning,
-        searchQuery,
-        searchResults,
-        loadLibrary,
-        scanForMusic,
-        search,
-        setSearchQuery,
-    } = useLibraryStore();
+const LibraryScreen: React.FC<LibraryScreenProps> = ({
+    searchQuery = '',
+    isSearchActive = false,
+    onNavigate,
+}) => {
+    const { colors } = useTheme();
+    const tracks = useLibraryStore(state => state.tracks);
+    const playlists = useLibraryStore(state => state.playlists);
+    const [playlistSearch, setPlaylistSearch] = useState('');
 
-    const { createQueue } = useQueueStore();
-    const { currentTrack } = usePlayerStore();
+    // Calculate counts for each category
+    const categoryCounts = useMemo(() => {
+        const now = Date.now();
+        const oneWeekAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-    useEffect(() => {
-        loadLibrary();
-    }, []);
+        return {
+            allSongs: tracks.length,
+            favorites: tracks.filter(t => t.isFavorite).length,
+            recentlyAdded: tracks.filter(t => t.dateAdded && t.dateAdded > oneWeekAgo).length,
+            recentlyPlayed: tracks.filter(t => t.lastPlayed && t.lastPlayed > oneWeekAgo).length,
+            mostPlayed: tracks.filter(t => (t.playCount || 0) >= 5).length,
+            notPlayed: tracks.filter(t => !t.playCount || t.playCount === 0).length,
+        };
+    }, [tracks]);
 
-    const handleTrackPress = async (track: Track, index: number) => {
-        const tracksToPlay = isSearching ? searchResults : tracks;
-        await createQueue(tracksToPlay, {
-            type: 'all',
-            name: isSearching ? 'Search Results' : 'All Tracks',
-        }, index);
-    };
+    // Build the library items list
+    const libraryItems = useMemo(() => {
+        const items: LibraryItem[] = [
+            // Main categories
+            {
+                id: 'all-songs',
+                title: 'All songs',
+                icon: 'music-note-outline',
+                type: 'category',
+                count: categoryCounts.allSongs,
+            },
+            {
+                id: 'favorites',
+                title: 'Favorites',
+                icon: 'heart',
+                type: 'category',
+                count: categoryCounts.favorites,
+            },
+            {
+                id: 'recently-added',
+                title: 'Recently added',
+                icon: 'clock-plus-outline',
+                type: 'category',
+                count: categoryCounts.recentlyAdded,
+            },
+            {
+                id: 'recently-played',
+                title: 'Recently played',
+                icon: 'history',
+                type: 'category',
+                count: categoryCounts.recentlyPlayed,
+            },
+            {
+                id: 'most-played',
+                title: 'Most played',
+                icon: 'fire',
+                type: 'category',
+                count: categoryCounts.mostPlayed,
+            },
+            {
+                id: 'not-played',
+                title: 'Not played',
+                icon: 'cancel',
+                type: 'category',
+                count: categoryCounts.notPlayed,
+            },
+            // Section header for playlists
+            {
+                id: 'playlists-header',
+                title: 'Your playlists',
+                icon: '',
+                type: 'section-header',
+            },
+            // User playlists
+            ...playlists
+                .filter(p => !playlistSearch || p.name.toLowerCase().includes(playlistSearch.toLowerCase()))
+                .map(playlist => ({
+                    id: `playlist-${playlist.id}`,
+                    title: playlist.name,
+                    icon: 'playlist-music',
+                    type: 'playlist' as const,
+                    count: playlist.trackIds?.length || 0,
+                })),
+        ];
 
-    const handleRefresh = async () => {
-        await scanForMusic();
-    };
+        // Filter by search query if active
+        if (isSearchActive && searchQuery) {
+            const query = searchQuery.toLowerCase();
+            return items.filter(item =>
+                item.type === 'section-header' ||
+                item.title.toLowerCase().includes(query)
+            );
+        }
 
-    const handleSearch = (text: string) => {
-        setSearchQuery(text);
-        search(text);
-    };
+        return items;
+    }, [categoryCounts, playlists, searchQuery, isSearchActive, playlistSearch]);
 
-    const tabs: { key: TabType; label: string; icon: string }[] = [
-        { key: 'tracks', label: 'Tracks', icon: 'music-note' },
-        { key: 'albums', label: 'Albums', icon: 'album' },
-        { key: 'artists', label: 'Artists', icon: 'account-music' },
-        { key: 'folders', label: 'Folders', icon: 'folder-music' },
-    ];
+    const handleItemPress = useCallback((item: LibraryItem) => {
+        if (item.type === 'section-header') return;
 
-    const displayTracks = isSearching && searchQuery ? searchResults : tracks;
+        if (onNavigate) {
+            onNavigate(item.id, { title: item.title });
+        }
+    }, [onNavigate]);
 
-    return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" />
-
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.headerTitle}>Library</Text>
-                <View style={styles.headerActions}>
-                    <TouchableOpacity
-                        style={styles.headerButton}
-                        onPress={() => setIsSearching(!isSearching)}
-                    >
-                        <Icon
-                            name={isSearching ? 'close' : 'magnify'}
-                            size={24}
-                            color={colors.textPrimary}
-                        />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={styles.headerButton}
-                        onPress={() => navigation.navigate('Settings')}
-                    >
-                        <Icon name="cog" size={24} color={colors.textPrimary} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Search Bar */}
-            {isSearching && (
-                <View style={styles.searchContainer}>
-                    <Icon name="magnify" size={20} color={colors.textTertiary} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search tracks, artists, albums..."
-                        placeholderTextColor={colors.textTertiary}
-                        value={searchQuery}
-                        onChangeText={handleSearch}
-                        autoFocus
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => handleSearch('')}>
-                            <Icon name="close-circle" size={20} color={colors.textTertiary} />
-                        </TouchableOpacity>
-                    )}
-                </View>
-            )}
-
-            {/* Tabs */}
-            {!isSearching && (
-                <View style={styles.tabsContainer}>
-                    {tabs.map(tab => (
-                        <TouchableOpacity
-                            key={tab.key}
-                            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-                            onPress={() => setActiveTab(tab.key)}
-                        >
-                            <Icon
-                                name={tab.icon}
-                                size={20}
-                                color={activeTab === tab.key ? colors.primary : colors.textSecondary}
-                            />
-                            <Text
-                                style={[
-                                    styles.tabText,
-                                    activeTab === tab.key && styles.tabTextActive,
-                                ]}
-                            >
-                                {tab.label}
-                            </Text>
-                        </TouchableOpacity>
-                    ))}
-                </View>
-            )}
-
-            {/* Content */}
-            {activeTab === 'tracks' || isSearching ? (
-                <FlatList
-                    data={displayTracks}
-                    keyExtractor={item => item.id}
-                    renderItem={({ item, index }) => (
-                        <TrackItem
-                            track={item}
-                            isPlaying={currentTrack?.id === item.id}
-                            onPress={() => handleTrackPress(item, index)}
-                            onOptionsPress={() => {
-                                // Show options modal
-                            }}
-                        />
-                    )}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={isScanning}
-                            onRefresh={handleRefresh}
-                            tintColor={colors.primary}
-                        />
-                    }
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <View style={styles.emptyContainer}>
-                            <Icon name="music-note" size={48} color={colors.textTertiary} />
-                            <Text style={styles.emptyText}>
-                                {isLoading ? 'Loading...' : 'No tracks found'}
-                            </Text>
-                            <TouchableOpacity
-                                style={styles.scanButton}
-                                onPress={handleRefresh}
-                            >
-                                <Text style={styles.scanButtonText}>Scan for Music</Text>
-                            </TouchableOpacity>
-                        </View>
-                    }
-                />
-            ) : (
-                <View style={styles.placeholderContainer}>
-                    <Icon name={tabs.find(t => t.key === activeTab)?.icon || 'album'} size={48} color={colors.textTertiary} />
-                    <Text style={styles.placeholderText}>
-                        {activeTab === 'albums' && `${albums.length} Albums`}
-                        {activeTab === 'artists' && `${artists.length} Artists`}
-                        {activeTab === 'folders' && `${folders.length} Folders`}
+    const renderItem = useCallback(({ item }: { item: LibraryItem }) => {
+        if (item.type === 'section-header') {
+            return (
+                <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionHeaderText, { color: colors.primary }]}>
+                        {item.title}
                     </Text>
                 </View>
-            )}
-        </SafeAreaView>
+            );
+        }
+
+        return (
+            <TouchableOpacity
+                style={styles.listItem}
+                onPress={() => handleItemPress(item)}
+                activeOpacity={0.7}
+            >
+                <View style={[styles.iconContainer, { backgroundColor: colors.surface }]}>
+                    <Icon
+                        name={item.icon}
+                        size={24}
+                        color={item.id === 'favorites' ? colors.error : colors.textSecondary}
+                    />
+                </View>
+                <View style={styles.itemContent}>
+                    <Text style={[styles.itemTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                        {item.title}
+                    </Text>
+                </View>
+            </TouchableOpacity>
+        );
+    }, [colors, handleItemPress]);
+
+    const keyExtractor = useCallback((item: LibraryItem) => item.id, []);
+
+    return (
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+            <FlatList
+                data={libraryItems}
+                renderItem={renderItem}
+                keyExtractor={keyExtractor}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                ListFooterComponent={
+                    <View style={styles.searchPlaylistContainer}>
+                        <View style={[styles.searchPlaylistButton, { backgroundColor: colors.surface }]}>
+                            <Icon name="magnify" size={20} color={colors.textSecondary} />
+                            <TextInput
+                                style={[styles.searchPlaylistInput, { color: colors.textPrimary }]}
+                                placeholder="Search a playlist..."
+                                placeholderTextColor={colors.textTertiary}
+                                value={playlistSearch}
+                                onChangeText={setPlaylistSearch}
+                            />
+                        </View>
+                    </View>
+                }
+            />
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
     },
-    header: {
+    listContent: {
+        paddingVertical: spacing.sm,
+    },
+    listItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
+        minHeight: 56,
+    },
+    iconContainer: {
+        width: 40,
+        height: 40,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.md,
+    },
+    itemContent: {
+        flex: 1,
+    },
+    itemTitle: {
+        fontSize: typography.sizes.md,
+        fontWeight: '500',
+    },
+    sectionHeader: {
+        paddingHorizontal: spacing.md,
+        paddingTop: spacing.lg,
+        paddingBottom: spacing.sm,
+    },
+    sectionHeaderText: {
+        fontSize: typography.sizes.sm,
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    searchPlaylistContainer: {
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.md,
     },
-    headerTitle: {
-        fontSize: typography.sizes.xxl,
-        fontWeight: typography.weights.bold,
-        color: colors.textPrimary,
-    },
-    headerActions: {
-        flexDirection: 'row',
-    },
-    headerButton: {
-        padding: spacing.sm,
-        marginLeft: spacing.sm,
-    },
-    searchContainer: {
+    searchPlaylistButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.surface,
-        marginHorizontal: spacing.md,
-        marginBottom: spacing.md,
         paddingHorizontal: spacing.md,
-        borderRadius: borderRadius.lg,
-    },
-    searchInput: {
-        flex: 1,
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.sm,
-        fontSize: typography.sizes.md,
-        color: colors.textPrimary,
-    },
-    tabsContainer: {
-        flexDirection: 'row',
-        paddingHorizontal: spacing.md,
-        marginBottom: spacing.md,
-    },
-    tab: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.sm,
+        paddingVertical: spacing.xs,
         borderRadius: borderRadius.md,
     },
-    tabActive: {
-        backgroundColor: colors.primary + '20',
-    },
-    tabText: {
-        fontSize: typography.sizes.sm,
-        color: colors.textSecondary,
-        marginLeft: spacing.xs,
-    },
-    tabTextActive: {
-        color: colors.primary,
-        fontWeight: typography.weights.medium,
-    },
-    listContent: {
-        paddingBottom: 100,
-    },
-    emptyContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: spacing.xxl,
-    },
-    emptyText: {
-        fontSize: typography.sizes.lg,
-        color: colors.textSecondary,
-        marginTop: spacing.md,
-    },
-    scanButton: {
-        marginTop: spacing.lg,
-        backgroundColor: colors.primary,
-        paddingHorizontal: spacing.lg,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.round,
-    },
-    scanButtonText: {
-        color: colors.textPrimary,
-        fontWeight: typography.weights.medium,
-    },
-    placeholderContainer: {
+    searchPlaylistInput: {
         flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    placeholderText: {
-        fontSize: typography.sizes.lg,
-        color: colors.textSecondary,
-        marginTop: spacing.md,
+        fontSize: typography.sizes.md,
+        marginLeft: spacing.sm,
+        paddingVertical: spacing.sm,
     },
 });
 

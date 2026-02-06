@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     StatusBar,
     SafeAreaView,
+    Image,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -28,7 +29,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onGetStarted }) => {
                     {/* Logo/Icon */}
                     <View style={styles.logoContainer}>
                         <View style={styles.logoCircle}>
-                            <Icon name="music-note" size={64} color={colors.primary} />
+                            <Image 
+                                source={require('@/assets/logo.jpg')} 
+                                style={styles.logoImage} 
+                            />
                         </View>
                     </View>
 
@@ -102,6 +106,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: 2,
         borderColor: colors.primary,
+        overflow: 'hidden',
+    },
+    logoImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
     },
     title: {
         fontSize: 42,

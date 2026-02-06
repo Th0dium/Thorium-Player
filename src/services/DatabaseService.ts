@@ -212,6 +212,25 @@ class DatabaseService {
         }
 
         await this.persistSongMetadata();
+        console.log(`[DatabaseService] Play count incremented for: ${filePath}, new count: ${metadata.playCount}`);
+    }
+
+    /**
+     * Update lastPlayed timestamp when a track starts playing
+     * Called immediately when playback begins (per DATA SYSTEM: "onStartCommand of the Media Player")
+     */
+    async updateLastPlayed(filePath: string): Promise<void> {
+        const metadata = await this.getSongMetadata(filePath);
+        metadata.lastPlayedTimestamp = Date.now();
+
+        // Also update the track record
+        const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
+        if (track) {
+            track.lastPlayed = metadata.lastPlayedTimestamp;
+            await this.persistTracks();
+        }
+
+        await this.persistSongMetadata();
     }
 
     /**
@@ -232,10 +251,14 @@ class DatabaseService {
 
     /**
      * Add listening time to a track
+     * Only adds time if it's a valid positive number
      */
     async addListenTime(filePath: string, seconds: number): Promise<void> {
+        // Validate input - only add positive, reasonable time values
+        if (seconds <= 0 || seconds > 3600) return; // Max 1 hour per call to prevent bugs
+
         const metadata = await this.getSongMetadata(filePath);
-        metadata.totalListenTime += seconds;
+        metadata.totalListenTime += Math.floor(seconds);
 
         const track = Array.from(this.cache.tracks.values()).find(t => t.path === filePath);
         if (track) {

@@ -1,5 +1,6 @@
 // Track List Item - Reusable track item component with consistent styling
 // Supports: Long press for multi-select, swipe actions, playback indicator
+// Performance: memo'd, minimal animated values, no entrance animation
 import React, { memo, useCallback } from 'react';
 import {
     View,
@@ -18,13 +19,18 @@ interface TrackListItemProps {
     index?: number; // Made optional since not all screens provide it
     isPlaying?: boolean;
     isSelected?: boolean;
+    isPast?: boolean; // For queue items that have already played
     showIndex?: boolean;
     showArtwork?: boolean;
     showSelection?: boolean; // Alias for selection mode
+    showDragHandle?: boolean; // Show drag handle for reordering
+    showRemoveButton?: boolean; // Show remove button for queue items
+    drag?: () => void; // Drag handler from react-native-draggable-flatlist
     onPress: (track: Track, index?: number) => void;
     onLongPress?: (track: Track, index?: number) => void;
     onMorePress?: (track: Track) => void;
     onMenuPress?: (track: Track) => void; // Alias for onMorePress
+    onRemove?: (track: Track, index?: number) => void; // For remove button
 }
 
 const TrackListItem: React.FC<TrackListItemProps> = memo(({
@@ -32,13 +38,18 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
     index = 0,
     isPlaying = false,
     isSelected = false,
+    isPast = false,
     showIndex = false,
     showArtwork = true,
     showSelection = false,
+    showDragHandle = false,
+    showRemoveButton = false,
+    drag,
     onPress,
     onLongPress,
     onMorePress,
     onMenuPress,
+    onRemove,
 }) => {
     const { colors } = useTheme();
 
@@ -55,26 +66,42 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
         (onMenuPress || onMorePress)?.(track);
     }, [track, onMorePress, onMenuPress]);
 
+    const handleRemove = useCallback(() => {
+        onRemove?.(track, index);
+    }, [track, index, onRemove]);
+
     return (
         <TouchableOpacity
             style={[
                 styles.container,
                 { backgroundColor: colors.surface },
-                isPlaying && [styles.containerPlaying, { backgroundColor: colors.primary + '15' }],
+                isPlaying && [styles.containerPlaying, { backgroundColor: colors.primary + '15', borderLeftColor: colors.primary }],
                 isSelected && [styles.containerSelected, { backgroundColor: colors.primary + '25' }],
+                isPast && styles.containerPast,
             ]}
             onPress={handlePress}
             onLongPress={handleLongPress}
             activeOpacity={0.7}
             delayLongPress={300}
         >
+            {/* Drag Handle */}
+            {showDragHandle && (
+                <TouchableOpacity
+                    style={styles.dragHandle}
+                    onLongPress={drag}
+                    delayLongPress={0}
+                >
+                    <Icon name="drag-horizontal-variant" size={20} color={colors.textTertiary} />
+                </TouchableOpacity>
+            )}
+
             {/* Index or Playing Indicator */}
             {showIndex && (
                 <View style={styles.indexContainer}>
                     {isPlaying ? (
                         <Icon name="volume-high" size={18} color={colors.primary} />
                     ) : (
-                        <Text style={[styles.indexText, { color: colors.textTertiary }]}>
+                        <Text style={[styles.indexText, { color: isPast ? colors.textTertiary : colors.textSecondary }]}>
                             {index + 1}
                         </Text>
                     )}
@@ -92,7 +119,10 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                         </View>
                     )}
                     {isPlaying && (
-                        <View style={[styles.playingOverlay, { backgroundColor: colors.primary + '80' }]}>
+                        <View style={[
+                            styles.playingOverlay,
+                            { backgroundColor: colors.primary + '80' },
+                        ]}>
                             <Icon name="play" size={16} color="#FFF" />
                         </View>
                     )}
@@ -106,21 +136,34 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                         styles.title,
                         { color: colors.textPrimary },
                         isPlaying && { color: colors.primary },
+                        isPast && { color: colors.textSecondary },
                     ]}
                     numberOfLines={1}
                 >
                     {track.title}
                 </Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                    {track.artist} • {formatDuration(track.duration)}
+                <Text style={[
+                    styles.subtitle,
+                    { color: colors.textSecondary },
+                    isPast && { color: colors.textTertiary }
+                ]} numberOfLines={1}>
+                    {track.artist}{track.album && track.album !== 'Unknown Album' ? ` • ${track.album}` : ''}{track.duration > 0 ? ` • ${formatDuration(track.duration)}` : ''}
                 </Text>
             </View>
 
-            {/* Selection Indicator or More Button */}
+            {/* Selection Indicator, Remove Button, or More Button */}
             {isSelected ? (
                 <View style={[styles.checkContainer, { backgroundColor: colors.primary }]}>
                     <Icon name="check" size={16} color="#FFF" />
                 </View>
+            ) : showRemoveButton ? (
+                <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={handleRemove}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Icon name="close" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
             ) : onMorePress ? (
                 <TouchableOpacity
                     style={styles.moreButton}
@@ -131,6 +174,17 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                 </TouchableOpacity>
             ) : null}
         </TouchableOpacity>
+    );
+}, (prevProps, nextProps) => {
+    // Custom memo comparator - only re-render if these specific props change
+    return (
+        prevProps.track.id === nextProps.track.id &&
+        prevProps.isPlaying === nextProps.isPlaying &&
+        prevProps.isSelected === nextProps.isSelected &&
+        prevProps.isPast === nextProps.isPast &&
+        prevProps.index === nextProps.index &&
+        prevProps.showDragHandle === nextProps.showDragHandle &&
+        prevProps.showRemoveButton === nextProps.showRemoveButton
     );
 });
 
@@ -154,6 +208,13 @@ const styles = StyleSheet.create({
     },
     containerSelected: {
         borderWidth: 1,
+    },
+    containerPast: {
+        opacity: 0.5,
+    },
+    dragHandle: {
+        paddingRight: spacing.sm,
+        paddingVertical: spacing.xs,
     },
     indexContainer: {
         width: 28,
@@ -208,6 +269,9 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    removeButton: {
+        padding: spacing.xs,
     },
     moreButton: {
         padding: spacing.xs,

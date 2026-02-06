@@ -1,25 +1,25 @@
-// Queue Store - Manages multiple playback queues (up to 20)
+// Queue Store - Manages multiple playback queues (dynamic)
 import { create } from 'zustand';
 import { Queue, Track, QueueSource } from '@/types';
 import { databaseService } from '@/services/DatabaseService';
 import { audioService } from '@/services/AudioService';
 import { usePlayerStore } from './playerStore';
 
-const MAX_QUEUES = 20;
+let nextQueueId = 1;
 
 interface QueueStore {
     // State
     queues: Queue[];
     currentQueue: Queue | null;
     currentIndex: number;
-    activeQueueIndex: number;
+    activeQueueIndex: number; // Index in the queues array (not queue ID)
     shuffledOrder: number[] | null;
 
     // Actions
     loadQueues: () => Promise<void>;
     createQueue: (tracks: Track[], source: QueueSource, startIndex?: number) => Promise<Queue>;
     switchToQueue: (queueId: string, startFromIndex?: number) => Promise<void>;
-    switchQueue: (index: number) => Promise<void>; // Switch by index
+    switchQueue: (index: number) => Promise<void>; // Switch by index in queues array
     deleteQueue: (queueId: string) => Promise<void>;
     clearCurrentQueue: () => Promise<void>;
     clearQueue: () => Promise<void>; // Alias for clearCurrentQueue
@@ -32,6 +32,10 @@ interface QueueStore {
     removeFromQueue: (index: number) => Promise<void>; // Alias
     moveInCurrentQueue: (fromIndex: number, toIndex: number) => Promise<void>;
     moveInQueue: (fromIndex: number, toIndex: number) => Promise<void>; // Alias
+    reorderQueue: (newTrackIds: string[]) => Promise<void>;
+
+    // Index sync
+    updateCurrentIndex: (index: number) => void;
 
     // Shuffle
     shuffleQueue: () => void;
@@ -45,23 +49,12 @@ interface QueueStore {
     getQueueTracks: () => Track[];
 }
 
-// Initialize empty queues
-const createEmptyQueues = (): Queue[] => {
-    return Array.from({ length: MAX_QUEUES }, (_, i) => ({
-        id: `queue_${i}`,
-        name: `Queue ${i + 1}`,
-        trackIds: [],
-        currentIndex: 0,
-        source: { type: 'all', name: `Queue ${i + 1}` },
-    }));
-};
-
 export const useQueueStore = create<QueueStore>((set, get) => ({
     // Initial state
-    queues: createEmptyQueues(),
+    queues: [],
     currentQueue: null,
     currentIndex: 0,
-    activeQueueIndex: 0,
+    activeQueueIndex: -1,
     shuffledOrder: null,
 
     // Load saved queues from database
@@ -69,29 +62,32 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const savedQueues = await databaseService.getAllQueues();
         const lastQueue = await databaseService.getLastPlayedQueue();
 
-        // Merge saved queues with empty queue slots
-        const queues = createEmptyQueues();
-        savedQueues.forEach((savedQueue, index) => {
-            if (index < MAX_QUEUES) {
-                queues[index] = savedQueue;
-            }
-        });
+        // Set nextQueueId based on highest existing ID
+        if (savedQueues.length > 0) {
+            const maxId = Math.max(...savedQueues.map(q => {
+                const idNum = parseInt(q.id.replace('queue_', ''), 10);
+                return isNaN(idNum) ? 0 : idNum;
+            }));
+            nextQueueId = maxId + 1;
+        }
 
         const activeIndex = lastQueue
-            ? queues.findIndex(q => q.id === lastQueue.id)
-            : 0;
+            ? savedQueues.findIndex(q => q.id === lastQueue.id)
+            : -1;
 
         set({
-            queues,
-            currentQueue: lastQueue || queues[0],
-            activeQueueIndex: activeIndex >= 0 ? activeIndex : 0,
+            queues: savedQueues,
+            currentQueue: lastQueue || null,
+            activeQueueIndex: activeIndex >= 0 ? activeIndex : -1,
         });
     },
 
     // Create a new queue and start playing
     createQueue: async (tracks, source, startIndex = 0) => {
+        const queueId = `queue_${nextQueueId++}`;
+
         const queue: Queue = {
-            id: `queue_${Date.now()}`,
+            id: queueId,
             name: source.name,
             trackIds: tracks.map(t => t.id),
             currentIndex: startIndex,
@@ -99,9 +95,14 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
             source,
         };
 
-        // Save queue
-        await databaseService.saveQueue(queue);
-        await databaseService.setLastPlayedQueue(queue.id);
+        // Add to queues array and update local state (optimistic)
+        set(state => ({
+            queues: [...state.queues, queue],
+            currentQueue: queue,
+            activeQueueIndex: state.queues.length, // New queue is at the end
+            currentIndex: startIndex,
+            shuffledOrder: null,
+        }));
 
         // Set up audio player
         await audioService.setQueue(tracks);
@@ -113,12 +114,9 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         usePlayerStore.getState().setCurrentTrack(tracks[startIndex]);
         usePlayerStore.getState().setCurrentQueueId(queue.id);
 
-        // Update local state
-        set(state => ({
-            queues: [...state.queues.filter(q => q.id !== queue.id), queue],
-            currentQueue: queue,
-            shuffledOrder: null,
-        }));
+        // Save to database
+        databaseService.saveQueue(queue).catch(e => console.warn('[QueueStore] Failed to save queue:', e));
+        databaseService.setLastPlayedQueue(queue.id).catch(e => console.warn('[QueueStore] Failed to set last played:', e));
 
         // Start playing
         await audioService.play();
@@ -156,8 +154,13 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         usePlayerStore.getState().setCurrentTrack(queueTracks[playIndex]);
         usePlayerStore.getState().setCurrentQueueId(queueId);
 
+        // Find the index of this queue in the queues array
+        const queueIndex = get().queues.findIndex(q => q.id === queueId);
+
         set({
             currentQueue: queue,
+            currentIndex: playIndex,
+            activeQueueIndex: queueIndex >= 0 ? queueIndex : get().activeQueueIndex,
             shuffledOrder: null,
         });
 
@@ -165,32 +168,47 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         usePlayerStore.getState().setIsPlaying(true);
     },
 
-    // Switch queue by index (0-19)
+    // Switch queue by index
     switchQueue: async (index) => {
         const { queues } = get();
         if (index < 0 || index >= queues.length) return;
 
         const queue = queues[index];
 
+        // Update active queue index first
+        set({ activeQueueIndex: index });
+
         // If queue has tracks, switch to it and play
         if (queue.trackIds.length > 0) {
             await get().switchToQueue(queue.id, queue.currentIndex);
+        } else {
+            // Empty queue - just update the current queue reference
+            set({ currentQueue: queue, currentIndex: 0 });
         }
-
-        // Update active queue index
-        set({
-            activeQueueIndex: index,
-            currentQueue: queue,
-        });
     },
 
     // Delete a queue
     deleteQueue: async (queueId) => {
         await databaseService.deleteQueue(queueId);
-        set(state => ({
-            queues: state.queues.filter(q => q.id !== queueId),
-            currentQueue: state.currentQueue?.id === queueId ? null : state.currentQueue,
-        }));
+        set(state => {
+            const newQueues = state.queues.filter(q => q.id !== queueId);
+            const deletedIndex = state.queues.findIndex(q => q.id === queueId);
+            let newActiveIndex = state.activeQueueIndex;
+
+            // Adjust active queue index if needed
+            if (deletedIndex < newActiveIndex) {
+                newActiveIndex--;
+            } else if (deletedIndex === newActiveIndex) {
+                // Active queue was deleted, switch to another
+                newActiveIndex = Math.min(newActiveIndex, newQueues.length - 1);
+            }
+
+            return {
+                queues: newQueues,
+                activeQueueIndex: newActiveIndex,
+                currentQueue: state.currentQueue?.id === queueId ? (newQueues[newActiveIndex] || null) : state.currentQueue,
+            };
+        });
     },
 
     // Clear current queue
@@ -291,6 +309,39 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     // Alias for moveInCurrentQueue
     moveInQueue: async (fromIndex, toIndex) => {
         await get().moveInCurrentQueue(fromIndex, toIndex);
+    },
+
+    // Reorder entire queue with new order
+    reorderQueue: async (newTrackIds) => {
+        const { currentQueue } = get();
+        if (!currentQueue) return;
+
+        // Find current track ID
+        const currentTrackId = currentQueue.trackIds[currentQueue.currentIndex];
+
+        // Update track order
+        currentQueue.trackIds = newTrackIds;
+
+        // Update current index to maintain same playing track
+        currentQueue.currentIndex = newTrackIds.indexOf(currentTrackId);
+
+        await databaseService.saveQueue(currentQueue);
+        set({ currentQueue: { ...currentQueue } });
+    },
+
+    // Update current index - called when TrackPlayer changes track
+    updateCurrentIndex: (index) => {
+        const { currentQueue } = get();
+        if (!currentQueue || index < 0 || index >= currentQueue.trackIds.length) return;
+
+        currentQueue.currentIndex = index;
+        set({ currentQueue: { ...currentQueue }, currentIndex: index });
+
+        // Update the track in playerStore
+        const allTracks = usePlayerStore.getState();
+        const trackId = currentQueue.trackIds[index];
+        // We'll need to find the track - use libraryStore since we have it imported indirectly
+        // The PlaybackService will handle setting the current track on playerStore
     },
 
     // Shuffle queue

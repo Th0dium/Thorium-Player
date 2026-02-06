@@ -5,6 +5,7 @@ import TrackPlayer, { Track } from 'react-native-track-player';
 import { Track as AppTrack, SongMetadata } from '@/types';
 import { databaseService } from './DatabaseService';
 import { fileSystemService } from './FileSystemService';
+import { libraryProfilingService } from './LibraryProfilingService';
 
 export interface ScanProgress {
     totalFound: number;
@@ -110,20 +111,31 @@ class SongScannerService {
             const existingTracks = await databaseService.getAllTracks();
             const existingTrackMap = new Map(existingTracks.map(t => [t.path, t]));
 
-            // Process each found track
+            // Batch profile all found tracks (more efficient than one-by-one)
+            const profiledTracks = await libraryProfilingService.profileLibrary(
+                deviceTracks,
+                (current, total) => {
+                    callback?.onProgress({
+                        totalFound: foundCount,
+                        profiled: current,
+                        inProgress: true,
+                        currentFile: deviceTracks[current]?.title || '',
+                        percentage: Math.round((current / total) * 100),
+                    });
+                }
+            );
+
+            // Save profiled tracks
             let profiledCount = 0;
 
-            for (const track of deviceTracks) {
+            for (const profiled of profiledTracks) {
                 if (this.cancelRequested) break;
 
                 try {
-                    const existingTrack = existingTrackMap.get(track.path || '');
-
-                    // Profile the track (get metadata, generate fingerprint, etc.)
-                    const profiled = await this.profileTrack(track);
+                    const existingTrack = existingTrackMap.get(profiled.path || '');
 
                     if (existingTrack) {
-                        // Track exists - update if needed
+                        // Track exists - update with profiled metadata
                         const updated = { ...existingTrack, ...profiled };
                         results.updatedTracks.push(updated);
                         await databaseService.saveTrack(updated);
@@ -134,16 +146,8 @@ class SongScannerService {
                     }
 
                     profiledCount++;
-
-                    callback?.onProgress({
-                        totalFound: foundCount,
-                        profiled: profiledCount,
-                        inProgress: true,
-                        currentFile: track.title || track.path || 'Unknown',
-                        percentage: Math.round((profiledCount / deviceTracks.length) * 100),
-                    });
                 } catch (error) {
-                    console.warn(`Failed to profile track: ${track.path}`, error);
+                    console.warn(`Failed to save track: ${profiled.path}`, error);
                 }
             }
 
@@ -167,76 +171,6 @@ class SongScannerService {
             this.isScanning = false;
             this.cancelRequested = false;
         }
-    }
-
-    /**
-     * Profile a single track: get metadata, generate fingerprint, initialize metadata
-     */
-    private async profileTrack(track: AppTrack): Promise<AppTrack> {
-        try {
-            // Get or create song metadata using the existing DatabaseService method
-            const metadata = await databaseService.getSongMetadata(track.path || '');
-
-            // Try to get additional metadata from TrackPlayer if available
-            try {
-                const trackInfo = await TrackPlayer.getTrackMetadata(track.id);
-                if (trackInfo) {
-                    track.title = trackInfo.title || track.title;
-                    track.artist = trackInfo.artist || track.artist;
-                    track.album = trackInfo.album || track.album;
-                    track.duration = trackInfo.duration || track.duration;
-                }
-            } catch (e) {
-                // TrackPlayer metadata not available, continue with basic info
-            }
-
-            return {
-                ...track,
-                id: track.id,
-                playCount: metadata.playCount,
-                isFavorite: metadata.isFavorite,
-                bookmarkPosition: metadata.bookmarkPosition || undefined,
-                totalListenTime: metadata.totalListenTime,
-                skipCount: metadata.skipCount,
-                rating: metadata.rating || undefined,
-                bookmarks: [],
-                aiTags: [],
-            };
-        } catch (error) {
-            console.warn(`Error profiling track ${track.path}:`, error);
-            return track;
-        }
-    }
-
-    /**
-     * Generate a fingerprint for a track (for identifying same track after path changes)
-     */
-    private generateFingerprint(path: string, fileSize: number, duration: number): string {
-        const filename = path.split('/').pop() || '';
-        const data = `${filename}|${fileSize}|${Math.round(duration)}`;
-        return this.simpleHash(data);
-    }
-
-    /**
-     * Get relative path from full path (for display and remapping)
-     */
-    private getRelativePath(fullPath: string): string {
-        // Remove common prefixes for cleaner display
-        const commonPrefixes = [
-            '/storage/emulated/0/',
-            '/sdcard/',
-            '/sdcard/',
-        ];
-
-        let relativePath = fullPath;
-        for (const prefix of commonPrefixes) {
-            if (fullPath.startsWith(prefix)) {
-                relativePath = fullPath.substring(prefix.length);
-                break;
-            }
-        }
-
-        return relativePath;
     }
 
     /**

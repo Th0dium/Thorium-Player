@@ -13,6 +13,16 @@ interface TrackingState {
     totalListenedTime: number;
     hasCountedPlay: boolean;
     lastUpdateTime: number;
+    isPlaying: boolean;
+}
+
+/**
+ * Normalize file path by removing file:// prefix if present
+ * This ensures consistent path handling across the app
+ */
+function normalizePath(path: string | undefined | null): string | null {
+    if (!path) return null;
+    return path.replace(/^file:\/\//, '');
 }
 
 class PlaybackTracker {
@@ -23,6 +33,7 @@ class PlaybackTracker {
         totalListenedTime: 0,
         hasCountedPlay: false,
         lastUpdateTime: Date.now(),
+        isPlaying: false,
     };
     private progressInterval: NodeJS.Timeout | null = null;
     private isTracking: boolean = false;
@@ -58,26 +69,39 @@ class PlaybackTracker {
      * Handle track change - save stats for previous track, reset for new track
      */
     private async handleTrackChange(event: { index?: number; track?: any }): Promise<void> {
-        // Save stats for the previous track
-        await this.saveCurrentTrackStats(false);
+        // Save stats for the previous track before switching
+        if (this.trackingState.currentTrackPath) {
+            await this.saveCurrentTrackStats(true);
+        }
 
         // Reset tracking for new track
         if (event.track) {
-            const trackPath = event.track.url?.replace('file://', '') || event.track.path;
+            const trackPath = normalizePath(event.track.url || event.track.path);
+
             this.trackingState = {
                 currentTrackPath: trackPath,
                 startPosition: 0,
                 totalListenedTime: 0,
                 hasCountedPlay: false,
                 lastUpdateTime: Date.now(),
+                isPlaying: false,
             };
 
-            // Record that playback started (for lastPlayed timestamp)
+            // Record that playback started (update lastPlayed timestamp immediately)
             if (trackPath) {
-                await databaseService.getSongMetadata(trackPath);
+                await databaseService.updateLastPlayed(trackPath);
+                console.log('[PlaybackTracker] Now tracking:', event.track.title);
             }
-
-            console.log('[PlaybackTracker] Now tracking:', event.track.title);
+        } else {
+            // No track - reset state completely
+            this.trackingState = {
+                currentTrackPath: null,
+                startPosition: 0,
+                totalListenedTime: 0,
+                hasCountedPlay: false,
+                lastUpdateTime: Date.now(),
+                isPlaying: false,
+            };
         }
     }
 
@@ -85,8 +109,16 @@ class PlaybackTracker {
      * Handle playback state changes (play, pause, stop)
      */
     private async handlePlaybackStateChange(event: { state: State }): Promise<void> {
-        if (event.state === State.Paused || event.state === State.Stopped) {
-            // Save stats when pausing or stopping
+        const wasPlaying = this.trackingState.isPlaying;
+        const isNowPlaying = event.state === State.Playing;
+
+        if (isNowPlaying && !wasPlaying) {
+            // Resuming playback - reset the timer to avoid counting paused time
+            this.trackingState.lastUpdateTime = Date.now();
+            this.trackingState.isPlaying = true;
+        } else if (!isNowPlaying && wasPlaying) {
+            // Pausing or stopping - save accumulated time first
+            this.trackingState.isPlaying = false;
             await this.saveCurrentTrackStats(false);
         }
     }
@@ -100,7 +132,12 @@ class PlaybackTracker {
         this.progressInterval = setInterval(async () => {
             try {
                 const state = await TrackPlayer.getPlaybackState();
-                if (state.state !== State.Playing) return;
+                const isPlaying = state.state === State.Playing;
+
+                // Update our local playing state
+                this.trackingState.isPlaying = isPlaying;
+
+                if (!isPlaying) return;
 
                 const progress = await TrackPlayer.getProgress();
                 await this.updateProgress(progress);
@@ -114,11 +151,16 @@ class PlaybackTracker {
      * Update progress and check for play count trigger
      */
     private async updateProgress(progress: Progress): Promise<void> {
-        if (!this.trackingState.currentTrackPath) return;
+        if (!this.trackingState.currentTrackPath || !this.trackingState.isPlaying) return;
 
         const now = Date.now();
         const elapsed = (now - this.trackingState.lastUpdateTime) / 1000;
-        this.trackingState.totalListenedTime += elapsed;
+
+        // Only count time if it's reasonable (< 2 seconds to handle interval drift)
+        // This prevents counting huge chunks of time if the app was backgrounded
+        if (elapsed > 0 && elapsed < 2) {
+            this.trackingState.totalListenedTime += elapsed;
+        }
         this.trackingState.lastUpdateTime = now;
 
         // Check if we should count this as a play
@@ -128,7 +170,7 @@ class PlaybackTracker {
 
             // Count play if:
             // 1. Position is >= 90% of duration, OR
-            // 2. Total listened time >= 30 seconds
+            // 2. Total listened time >= 30 seconds (per DATA SYSTEM spec)
             const reachedPercentage = duration > 0 && (position / duration) >= PLAY_COUNT_PERCENTAGE;
             const reachedMinTime = this.trackingState.totalListenedTime >= PLAY_COUNT_MIN_SECONDS;
 
