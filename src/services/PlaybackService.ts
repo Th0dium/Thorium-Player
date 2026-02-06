@@ -1,5 +1,6 @@
 // Playback Service - Background playback handler for react-native-track-player
 import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { BackHandler } from 'react-native';
 import { useSettingsStore } from '@/store/settingsStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
@@ -66,8 +67,18 @@ module.exports = async function () {
     });
 
     // Handle playback ending
-    TrackPlayer.addEventListener(Event.PlaybackQueueEnded, (event) => {
+    TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async (event) => {
         console.log('Queue ended', event);
+        try {
+            const { closeOnQueueEnd } = useSettingsStore.getState();
+            if (closeOnQueueEnd) {
+                console.log('[PlaybackService] Queue ended - closing app per user setting');
+                await TrackPlayer.stop();
+                BackHandler.exitApp();
+            }
+        } catch (e) {
+            console.warn('[PlaybackService] Error handling queue end:', e);
+        }
     });
 
     // Handle track change - sync player store and queue store with TrackPlayer

@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const SETTINGS_STORAGE_KEY = '@thorium/ui_settings';
 
 export type TabId = 'queue' | 'nowPlaying' | 'library' | 'folders' | 'albums' | 'artists' | 'playlists' | 'genres' | 'songs';
-export type ThemeOption = 'dark' | 'light' | 'system';
+export type ThemeOption = 'dark' | 'light' | 'system' | 'amoled';
 export type FolderViewOption = 'linear' | 'hierarchical';
 export type QueueBehavior = 'addToEnd' | 'playNext' | 'clearAndPlay';
 
@@ -41,6 +41,7 @@ interface UISettings {
 
     // Appearance
     theme: ThemeOption;
+    accentColor: string | null; // null = default purple, else hex color
     folderView: FolderViewOption;
 
     // Behavior
@@ -50,6 +51,7 @@ interface UISettings {
     autoScanOnStartup: boolean;
     showTrackNotification: boolean;
     gaplessPlayback: boolean;
+    closeOnQueueEnd: boolean;
 
     // Navigation state persistence
     librarySubScreen: string | null;
@@ -66,6 +68,7 @@ interface SettingsStore extends UISettings {
     // Setters
     setSelectedTabs: (tabs: TabId[]) => void;
     setTheme: (theme: ThemeOption) => void;
+    setAccentColor: (color: string | null) => void;
     setFolderView: (view: FolderViewOption) => void;
     setQueueBehavior: (behavior: QueueBehavior) => void;
     setPauseOnUnplug: (value: boolean) => void;
@@ -73,6 +76,7 @@ interface SettingsStore extends UISettings {
     setAutoScanOnStartup: (value: boolean) => void;
     setShowTrackNotification: (value: boolean) => void;
     setGaplessPlayback: (value: boolean) => void;
+    setCloseOnQueueEnd: (value: boolean) => void;
     setLibraryNavigation: (screen: string | null, title?: string) => void;
 
     // Bulk update
@@ -85,6 +89,7 @@ interface SettingsStore extends UISettings {
 const DEFAULT_SETTINGS: UISettings = {
     selectedTabs: ['queue', 'nowPlaying', 'library'],
     theme: 'dark',
+    accentColor: null,
     folderView: 'hierarchical',
     queueBehavior: 'clearAndPlay',
     pauseOnUnplug: true,
@@ -92,6 +97,7 @@ const DEFAULT_SETTINGS: UISettings = {
     autoScanOnStartup: false,
     showTrackNotification: true,
     gaplessPlayback: true,
+    closeOnQueueEnd: false,
     librarySubScreen: null,
     librarySubTitle: '',
 };
@@ -126,6 +132,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             const settings: UISettings = {
                 selectedTabs: state.selectedTabs,
                 theme: state.theme,
+                accentColor: state.accentColor,
                 folderView: state.folderView,
                 queueBehavior: state.queueBehavior,
                 pauseOnUnplug: state.pauseOnUnplug,
@@ -133,6 +140,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                 autoScanOnStartup: state.autoScanOnStartup,
                 showTrackNotification: state.showTrackNotification,
                 gaplessPlayback: state.gaplessPlayback,
+                closeOnQueueEnd: state.closeOnQueueEnd,
                 librarySubScreen: state.librarySubScreen,
                 librarySubTitle: state.librarySubTitle,
             };
@@ -150,6 +158,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
     setTheme: (theme) => {
         set({ theme });
+        get().saveSettings();
+    },
+
+    setAccentColor: (color) => {
+        set({ accentColor: color });
         get().saveSettings();
     },
 
@@ -185,6 +198,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
     setGaplessPlayback: (value) => {
         set({ gaplessPlayback: value });
+        get().saveSettings();
+    },
+
+    setCloseOnQueueEnd: (value) => {
+        set({ closeOnQueueEnd: value });
         get().saveSettings();
     },
 

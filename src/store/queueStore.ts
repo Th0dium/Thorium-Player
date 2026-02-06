@@ -106,6 +106,20 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
     // Create a new queue and start playing
     createQueue: async (tracks, source, startIndex = 0) => {
+        const { queues, deleteQueue } = get();
+        
+        // Find if a queue with same name and same source type already exists
+        const existingQueue = queues.find(q => 
+            q.name === source.name && 
+            q.source.type === source.type &&
+            (source.id ? q.source.id === source.id : true)
+        );
+
+        if (existingQueue) {
+            // Delete the old one silently before creating new
+            await deleteQueue(existingQueue.id);
+        }
+
         const queueId = `queue_${nextQueueId++}`;
 
         const queue: Queue = {

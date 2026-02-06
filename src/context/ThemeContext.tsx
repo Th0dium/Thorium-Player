@@ -52,6 +52,20 @@ const darkColors = {
     aiGradientEnd: '#00E5FF',
 };
 
+// AMOLED Black theme — pure black for OLED screens
+const amoledColors: ThemeColors = {
+    ...darkColors,
+    background: '#000000',
+    backgroundSecondary: '#0A0A0A',
+    backgroundTertiary: '#111111',
+    surface: '#0A0A0A',
+    surfaceElevated: '#141414',
+    surfaceVariant: '#1A1A1A',
+    border: '#222222',
+    playerBackground: '#000000',
+    seekBarBackground: '#222222',
+};
+
 // Light theme colors
 const lightColors = {
     // Primary colors
@@ -121,31 +135,69 @@ interface ThemeProviderProps {
     children: React.ReactNode;
 }
 
+// Helper to lighten a hex color
+const lightenColor = (hex: string, amount: number): string => {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const r = Math.min(255, ((num >> 16) & 0xFF) + Math.round(255 * amount));
+    const g = Math.min(255, ((num >> 8) & 0xFF) + Math.round(255 * amount));
+    const b = Math.min(255, (num & 0xFF) + Math.round(255 * amount));
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+};
+
+// Helper to darken a hex color
+const darkenColor = (hex: string, amount: number): string => {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const r = Math.max(0, ((num >> 16) & 0xFF) - Math.round(255 * amount));
+    const g = Math.max(0, ((num >> 8) & 0xFF) - Math.round(255 * amount));
+    const b = Math.max(0, (num & 0xFF) - Math.round(255 * amount));
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+};
+
+// Apply custom accent color to a theme palette
+const applyAccentColor = (baseColors: ThemeColors, accent: string): ThemeColors => ({
+    ...baseColors,
+    primary: accent,
+    primaryLight: lightenColor(accent, 0.25),
+    primaryDark: darkenColor(accent, 0.25),
+    seekBar: accent,
+    aiSecondary: accent,
+    aiGradientStart: accent,
+});
+
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     const systemColorScheme = useColorScheme();
-    const { theme: themePreference } = useSettingsStore();
+    const themePreference = useSettingsStore(s => s.theme);
+    const accentColor = useSettingsStore(s => s.accentColor);
 
     const { colors, isDark } = useMemo(() => {
         let isDark: boolean;
+        let baseColors: ThemeColors;
 
         switch (themePreference) {
             case 'light':
                 isDark = false;
+                baseColors = lightColors;
+                break;
+            case 'amoled':
+                isDark = true;
+                baseColors = amoledColors;
                 break;
             case 'dark':
                 isDark = true;
+                baseColors = darkColors;
                 break;
             case 'system':
             default:
                 isDark = systemColorScheme === 'dark';
+                baseColors = isDark ? darkColors : lightColors;
                 break;
         }
 
-        return {
-            colors: isDark ? darkColors : lightColors,
-            isDark,
-        };
-    }, [themePreference, systemColorScheme]);
+        // Apply custom accent color if set
+        const colors = accentColor ? applyAccentColor(baseColors, accentColor) : baseColors;
+
+        return { colors, isDark };
+    }, [themePreference, systemColorScheme, accentColor]);
 
     const value = useMemo(() => ({
         colors,

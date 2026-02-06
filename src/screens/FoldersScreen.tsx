@@ -21,6 +21,7 @@ import TrackListItem from '@/components/TrackListItem';
 
 interface FoldersScreenProps {
     searchQuery?: string;
+    onPlay?: () => void;
 }
 
 interface FolderItem {
@@ -28,7 +29,7 @@ interface FolderItem {
     data: Folder | Track;
 }
 
-const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
+const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay }) => {
     const { colors } = useTheme();
     const [currentPath, setCurrentPath] = useState<string[]>([]);
 
@@ -118,7 +119,8 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
             type: 'folder',
             name: currentPath.length > 0 ? currentPath[currentPath.length - 1] : 'Root',
         }, trackIndex);
-    }, [tracksInCurrentFolder, currentPath, createQueue]);
+        onPlay?.();
+    }, [tracksInCurrentFolder, currentPath, createQueue, onPlay]);
 
     const handleBackPress = useCallback(() => {
         setCurrentPath(prev => prev.slice(0, -1));
@@ -134,8 +136,9 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
                 type: 'folder',
                 name: currentPath.length > 0 ? currentPath[currentPath.length - 1] : 'All Folders',
             }, 0);
+            onPlay?.();
         }
-    }, [tracksInCurrentFolder, currentPath, createQueue]);
+    }, [tracksInCurrentFolder, currentPath, createQueue, onPlay]);
 
     const handleShuffleAll = useCallback(async () => {
         if (tracksInCurrentFolder.length > 0) {
@@ -144,8 +147,9 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '' }) => {
                 type: 'folder',
                 name: currentPath.length > 0 ? currentPath[currentPath.length - 1] : 'All Folders',
             }, 0);
+            onPlay?.();
         }
-    }, [tracksInCurrentFolder, currentPath, createQueue]);
+    }, [tracksInCurrentFolder, currentPath, createQueue, onPlay]);
 
     const renderItem = ({ item, index }: { item: FolderItem; index: number }) => {
         if (item.type === 'folder') {

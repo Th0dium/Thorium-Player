@@ -9,6 +9,7 @@ interface PlayerStore extends PlayerState {
     // Extended state
     abRepeat: ABRepeatState | null;
     bookmarkPosition: number | null; // For resume playback
+    playbackSpeed: number;
 
     // Actions
     setCurrentTrack: (track: Track | null) => void;
@@ -19,6 +20,7 @@ interface PlayerStore extends PlayerState {
     setShuffleMode: (mode: ShuffleMode) => void;
     setVolume: (volume: number) => void;
     setCurrentQueueId: (queueId: string | null) => void;
+    setPlaybackSpeed: (speed: number) => Promise<void>;
 
     // Playback actions
     play: () => Promise<void>;
@@ -57,6 +59,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     volume: 1,
     abRepeat: null,
     bookmarkPosition: null,
+    playbackSpeed: 1.0,
 
     // Setters
     setCurrentTrack: (track) => set({ currentTrack: track }),
@@ -67,6 +70,18 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     setShuffleMode: (mode) => set({ shuffleMode: mode }),
     setVolume: (volume) => set({ volume }),
     setCurrentQueueId: (queueId) => set({ currentQueueId: queueId }),
+
+    setPlaybackSpeed: async (speed) => {
+        set({ playbackSpeed: speed });
+        await audioService.setPlaybackRate(speed);
+        // Persist speed setting
+        try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            await AsyncStorage.setItem('@thorium/playback_speed', speed.toString());
+        } catch (e) {
+            console.warn('[PlayerStore] Failed to persist playback speed:', e);
+        }
+    },
 
     // Playback actions - Use optimistic updates (set state BEFORE async call for instant UI response)
     play: async () => {
@@ -215,9 +230,23 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         const abRepeat = await databaseService.getABRepeat();
         const playbackState = await databaseService.getPlaybackState();
 
+        // Restore playback speed
+        let playbackSpeed = 1.0;
+        try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const savedSpeed = await AsyncStorage.getItem('@thorium/playback_speed');
+            if (savedSpeed) {
+                playbackSpeed = parseFloat(savedSpeed);
+                await audioService.setPlaybackRate(playbackSpeed);
+            }
+        } catch (e) {
+            console.warn('[PlayerStore] Failed to restore playback speed:', e);
+        }
+
         set({
             volume,
             abRepeat,
+            playbackSpeed,
             bookmarkPosition: playbackState?.position || null,
         });
     },

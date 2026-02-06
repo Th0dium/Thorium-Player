@@ -34,6 +34,7 @@ interface SongsListScreenProps {
     searchQuery?: string;
     isSearchActive?: boolean;
     onBack?: () => void;
+    onPlay?: () => void;
 }
 
 const SongsListScreen: React.FC<SongsListScreenProps> = ({
@@ -46,6 +47,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     searchQuery = '',
     isSearchActive = false,
     onBack,
+    onPlay,
 }) => {
     const { colors } = useTheme();
     const tracks = useLibraryStore(state => state.tracks);
@@ -209,7 +211,8 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
             name: title,
             id: playlistId || albumId || artistId || genreId,
         }, index);
-    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId]);
+        onPlay?.();
+    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay]);
 
     const handleSortOptionPress = (option: SortOption) => {
         if (sortBy === option) {

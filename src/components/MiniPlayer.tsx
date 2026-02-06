@@ -12,6 +12,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useProgress } from 'react-native-track-player';
 import { usePlayerStore } from '@/store/playerStore';
+import { useSleepTimerStore } from '@/services/SleepTimerService';
 import { useTheme } from '@/context/ThemeContext';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
@@ -55,6 +56,8 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const togglePlayPause = usePlayerStore(state => state.togglePlayPause);
     const skipNext = usePlayerStore(state => state.skipNext);
+    const sleepTimerActive = useSleepTimerStore(state => state.isActive);
+    const sleepTimerDisplay = useSleepTimerStore(state => state.displayTime);
 
     const containerScale = useRef(new Animated.Value(1)).current;
     const playScale = useRef(new Animated.Value(1)).current;
@@ -117,6 +120,16 @@ const MiniPlayer: React.FC<MiniPlayerProps> = ({ onPress }) => {
                             {currentTrack.artist}
                         </Text>
                     </View>
+
+                    {/* Sleep timer indicator */}
+                    {sleepTimerActive && (
+                        <View style={styles.timerBadge}>
+                            <Icon name="timer-sand" size={12} color={colors.primary} />
+                            <Text style={[styles.timerText, { color: colors.primary }]}>
+                                {sleepTimerDisplay}
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Controls */}
                     <View style={styles.controlsContainer}>
@@ -208,6 +221,17 @@ const styles = StyleSheet.create({
     },
     controlButton: {
         padding: spacing.sm,
+    },
+    timerBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        paddingHorizontal: spacing.xs,
+        marginRight: spacing.xs,
+    },
+    timerText: {
+        fontSize: typography.sizes.xs,
+        fontWeight: '600',
     },
 });
 

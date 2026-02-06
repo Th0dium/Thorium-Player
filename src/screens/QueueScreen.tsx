@@ -1,6 +1,6 @@
 // Queue Screen - View and manage current playback queue with Multi-Queue support
 // Musicolet-style: Queue switcher as list, per-queue name from source, drag reorder
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -37,6 +37,7 @@ interface QueueScreenProps {
 const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchActive = false }) => {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
+    const flatListRef = useRef<FlatList<any>>(null);
 
     const queues = useQueueStore(state => state.queues);
     const currentQueue = useQueueStore(state => state.currentQueue);
@@ -52,13 +53,30 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
     const [editingName, setEditingName] = useState('');
 
+    // Scroll to current index when queue changes or initial load
+    useEffect(() => {
+        if (currentQueue && currentQueue.trackIds.length > 0 && currentIndex >= 0) {
+            // Small timeout to ensure layout is complete
+            setTimeout(() => {
+                flatListRef.current?.scrollToIndex({
+                    index: currentIndex,
+                    animated: true,
+                    viewPosition: 0.3, // Show a bit of context above
+                });
+            }, 500);
+        }
+    }, [currentQueue?.id, currentIndex]); // Only scroll when queue ID or index changes
+
     // Get tracks from current queue
     const queueTracks = useMemo(() => {
-        if (!currentQueue) return [];
+        if (!currentQueue || currentQueue.trackIds.length === 0) return [];
+        
+        // Use a Map for O(1) lookups
+        const trackMap = new Map(tracks.map(t => [t.id, t]));
         return currentQueue.trackIds
-            .map(id => tracks.find(t => t.id === id))
+            .map(id => trackMap.get(id))
             .filter((t): t is Track => t !== undefined);
-    }, [currentQueue, tracks]);
+    }, [currentQueue?.trackIds, tracks]); // Only re-run if track IDs or the library changes
 
     // Filter tracks based on search
     const filteredTracks = useMemo(() => {
@@ -155,10 +173,36 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         return queue.name || queue.source?.name || `Queue ${index + 1}`;
     }, []);
 
+    // Memoize the total duration of the current queue
+    const totalQueueDuration = useMemo(() => {
+        return formatTotalDuration(queueTracks);
+    }, [queueTracks]);
+
+    // Get queues with metadata pre-calculated
+    const queuesWithMetadata = useMemo(() => {
+        const trackMap = new Map(tracks.map(t => [t.id, t]));
+        return queues.map((queue, index) => {
+            const hasContent = queue.trackIds.length > 0;
+            if (!hasContent) return { queue, index, duration: '0s', trackCount: 0 };
+            
+            const qTracks = queue.trackIds
+                .map(id => trackMap.get(id))
+                .filter((t): t is Track => t !== undefined);
+                
+            return {
+                queue,
+                index,
+                duration: formatTotalDuration(qTracks),
+                trackCount: queue.trackIds.length,
+                displayName: getQueueDisplayName(queue, index)
+            };
+        });
+    }, [queues, tracks, getQueueDisplayName]);
+
     // Get queues that have tracks (non-empty)
     const nonEmptyQueues = useMemo(() => {
-        return queues.filter(q => q.trackIds.length > 0);
-    }, [queues]);
+        return queuesWithMetadata.filter(q => q.trackCount > 0);
+    }, [queuesWithMetadata]);
 
     const handleDragEnd = useCallback(({ data, from, to }: { data: Track[]; from: number; to: number }) => {
         if (from === to) return;
@@ -229,23 +273,17 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     }, [currentIndex, handleTrackPress, removeFromQueue, isSearchActive, searchQuery, queueTracks]);
 
     // --- Render Queue Switcher Modal Item ---
-    const renderQueueSwitcherItem = ({ item: queue, index }: { item: Queue, index: number }) => {
+    const renderQueueSwitcherItem = useCallback(({ item: meta }: { item: typeof queuesWithMetadata[0] }) => {
+        const { queue, index, duration, trackCount, displayName } = meta;
         const isActive = index === activeQueueIndex;
-        const hasContent = queue.trackIds.length > 0;
         const isEditing = editingQueueIndex === index;
-        const trackCount = queue.trackIds.length;
-
-        // Calculate total duration for this queue (hooks can't be used here)
-        const queueTracksForDuration = queue.trackIds
-            .map(id => tracks.find(t => t.id === id))
-            .filter((t): t is Track => t !== undefined);
-        const queueDuration = formatTotalDuration(queueTracksForDuration);
 
         // Skip empty queues
-        if (!hasContent) return null;
+        if (trackCount === 0) return null;
 
         return (
             <TouchableOpacity
+                key={queue.id}
                 style={[
                     styles.bsItem,
                     isActive && { backgroundColor: colors.surfaceVariant + '40' }
@@ -285,7 +323,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                             styles.bsTitle,
                             { color: isActive ? colors.primary : colors.textPrimary }
                         ]} numberOfLines={1}>
-                            {getQueueDisplayName(queue, index)}
+                            {displayName}
                         </Text>
                     )}
                     <View style={styles.bsSubtitleContainer}>
@@ -294,7 +332,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                         </Text>
                         <View style={[styles.bsDot, { backgroundColor: colors.textTertiary }]} />
                         <Text style={[styles.bsSubtitle, { color: colors.textSecondary }]}>
-                            {queueDuration}
+                            {duration}
                         </Text>
                     </View>
                 </View>
@@ -320,7 +358,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 </View>
             </TouchableOpacity>
         );
-    };
+    }, [activeQueueIndex, editingQueueIndex, editingName, colors, handleSwitchQueue, handleStartRename, handleRemoveQueue, handleSaveRename]);
 
     return (
         <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -352,7 +390,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     <View style={styles.infoRight}>
                         <Icon name="clock-outline" size={16} color={colors.textSecondary} />
                         <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                            {formatTotalDuration(queueTracks)}
+                            {totalQueueDuration}
                         </Text>
                     </View>
                 </View>
@@ -361,6 +399,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
             {/* Queue List */}
             {queueTracks.length > 0 ? (
                 <DraggableFlatList
+                    ref={flatListRef}
                     data={filteredTracks}
                     keyExtractor={(item, index) => `${item.id}-${index}`}
                     renderItem={renderQueueItem}
@@ -369,6 +408,20 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 120 }}
                     activationDistance={10}
+                    getItemLayout={(_, index) => ({
+                        length: 72, // Approximate height of TrackListItem (padding + content)
+                        offset: 72 * index,
+                        index,
+                    })}
+                    onScrollToIndexFailed={(info) => {
+                        setTimeout(() => {
+                            flatListRef.current?.scrollToIndex({
+                                index: info.index,
+                                animated: true,
+                                viewPosition: 0.3,
+                            });
+                        }, 500);
+                    }}
                 />
             ) : (
                 <EmptyState
@@ -421,8 +474,8 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
 
                         {/* List */}
                         <FlatList
-                            data={queues}
-                            keyExtractor={(item, index) => `queue-${index}`}
+                            data={queuesWithMetadata}
+                            keyExtractor={(item) => item.queue.id}
                             renderItem={renderQueueSwitcherItem}
                             contentContainerStyle={styles.bsListContent}
                             ListEmptyComponent={

@@ -22,6 +22,9 @@ import { useTheme } from '@/context/ThemeContext';
 import PlayerControls from '@/components/PlayerControls';
 import ProgressBar from '@/components/ProgressBar';
 import { spacing, typography, borderRadius } from '@/constants/theme';
+import { ABRepeatState } from '@/types';
+import SleepTimerModal from '@/components/SleepTimerModal';
+import { useSleepTimerStore } from '@/services/SleepTimerService';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ARTWORK_SIZE = SCREEN_WIDTH - 80;
@@ -39,6 +42,21 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
     const toggleFavorite = usePlayerStore(s => s.toggleFavorite);
     const skipNext = usePlayerStore(s => s.skipNext);
     const skipPrevious = usePlayerStore(s => s.skipPrevious);
+    const abRepeat = usePlayerStore(s => s.abRepeat);
+    const setABRepeat = usePlayerStore(s => s.setABRepeat);
+    const clearABRepeat = usePlayerStore(s => s.clearABRepeat);
+    const toggleABRepeat = usePlayerStore(s => s.toggleABRepeat);
+    const playbackSpeed = usePlayerStore(s => s.playbackSpeed);
+    const setPlaybackSpeed = usePlayerStore(s => s.setPlaybackSpeed);
+
+    // A-B Repeat state: 'idle' | 'a-set' (waiting for B point)
+    const [abMode, setAbMode] = useState<'idle' | 'a-set'>('idle');
+    const [pointA, setPointA] = useState<number | null>(null);
+
+    // Sleep timer
+    const [showSleepTimer, setShowSleepTimer] = useState(false);
+    const sleepTimerActive = useSleepTimerStore(s => s.isActive);
+    const sleepTimerDisplay = useSleepTimerStore(s => s.displayTime);
     const artworkScale = useRef(new Animated.Value(0.85)).current;
     const artworkOpacity = useRef(new Animated.Value(0)).current;
     const heartScale = useRef(new Animated.Value(1)).current;
@@ -87,20 +105,52 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
     }, [heartScale, toggleFavorite]);
 
     // Playback speed
-    const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
-
     const handleSpeedPress = useCallback(() => {
         const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
         const buttons = speeds.map(s => ({
             text: `${s}x${s === playbackSpeed ? ' ✓' : ''}`,
             onPress: () => {
-                TrackPlayer.setRate(s);
                 setPlaybackSpeed(s);
             },
         }));
         buttons.push({ text: 'Cancel', onPress: () => { } });
         Alert.alert('Playback Speed', 'Select speed', buttons);
     }, [playbackSpeed]);
+
+    // A-B Repeat handler — state machine: idle → A set → A-B active → clear
+    const handleABRepeatPress = useCallback(async () => {
+        if (abRepeat && abRepeat.isActive) {
+            // Currently active — clear it
+            await clearABRepeat();
+            setAbMode('idle');
+            setPointA(null);
+        } else if (abMode === 'idle') {
+            // Set point A at current position
+            const { position } = await TrackPlayer.getProgress();
+            setPointA(position);
+            setAbMode('a-set');
+        } else if (abMode === 'a-set' && pointA !== null) {
+            // Set point B and activate loop
+            const { position } = await TrackPlayer.getProgress();
+            if (position > pointA) {
+                await setABRepeat(pointA, position);
+            } else {
+                // B must be after A — swap if needed
+                await setABRepeat(position, pointA);
+            }
+            setAbMode('idle');
+            setPointA(null);
+        }
+    }, [abRepeat, abMode, pointA, clearABRepeat, setABRepeat]);
+
+    // Long-press to clear A-B repeat
+    const handleABRepeatLongPress = useCallback(async () => {
+        if (abRepeat || abMode === 'a-set') {
+            await clearABRepeat();
+            setAbMode('idle');
+            setPointA(null);
+        }
+    }, [abRepeat, abMode, clearABRepeat]);
 
     // Pan responder for swipe-down to dismiss
     const panResponder = useRef(
@@ -201,10 +251,12 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                             opacity: artworkOpacity,
                         }}>
                             {currentTrack.albumArt ? (
-                                <Image
-                                    source={{ uri: currentTrack.albumArt }}
-                                    style={styles.artwork}
-                                />
+                                <View style={styles.artworkShadow}>
+                                    <Image
+                                        source={{ uri: currentTrack.albumArt }}
+                                        style={styles.artworkImage}
+                                    />
+                                </View>
                             ) : (
                                 <View style={[styles.artworkPlaceholder, { backgroundColor: colors.surface }]}>
                                     <Icon name="music-note" size={100} color={colors.textTertiary} />
@@ -240,7 +292,7 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                     </View>
 
                     {/* Progress Bar */}
-                    <ProgressBar />
+                    <ProgressBar abRepeat={abRepeat} pointA={abMode === 'a-set' ? pointA : null} />
 
                     {/* Main Controls */}
                     <PlayerControls size="large" showShuffleRepeat={true} />
@@ -252,9 +304,21 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                             <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Queue</Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('A-B Repeat', 'Coming soon')}>
-                            <Icon name="repeat-variant" size={22} color={colors.textSecondary} />
-                            <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>A-B</Text>
+                        <TouchableOpacity
+                            style={styles.powerButton}
+                            onPress={handleABRepeatPress}
+                            onLongPress={handleABRepeatLongPress}
+                        >
+                            <Icon
+                                name="repeat-variant"
+                                size={22}
+                                color={abRepeat?.isActive ? colors.primary : abMode === 'a-set' ? '#FFA500' : colors.textSecondary}
+                            />
+                            <Text style={[styles.powerButtonLabel, {
+                                color: abRepeat?.isActive ? colors.primary : abMode === 'a-set' ? '#FFA500' : colors.textSecondary,
+                            }]}>
+                                {abRepeat?.isActive ? 'A↔B' : abMode === 'a-set' ? 'Set B' : 'A-B'}
+                            </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.powerButton} onPress={handleSpeedPress}>
@@ -264,9 +328,11 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('Sleep Timer', 'Coming soon')}>
-                            <Icon name="timer-outline" size={22} color={colors.textSecondary} />
-                            <Text style={[styles.powerButtonLabel, { color: colors.textSecondary }]}>Timer</Text>
+                        <TouchableOpacity style={styles.powerButton} onPress={() => setShowSleepTimer(true)}>
+                            <Icon name={sleepTimerActive ? 'timer-sand' : 'timer-outline'} size={22} color={sleepTimerActive ? colors.primary : colors.textSecondary} />
+                            <Text style={[styles.powerButtonLabel, { color: sleepTimerActive ? colors.primary : colors.textSecondary }]}>
+                                {sleepTimerActive ? sleepTimerDisplay : 'Timer'}
+                            </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity style={styles.powerButton} onPress={() => Alert.alert('Tag Editor', 'Coming soon')}>
@@ -276,6 +342,12 @@ const NowPlayingScreen: React.FC<NowPlayingScreenProps> = ({
                     </View>
                 </SafeAreaView>
             </LinearGradient>
+
+            {/* Sleep Timer Modal */}
+            <SleepTimerModal
+                visible={showSleepTimer}
+                onClose={() => setShowSleepTimer(false)}
+            />
         </View>
     );
 };
@@ -337,7 +409,7 @@ const styles = StyleSheet.create({
         marginTop: spacing.lg,
         marginBottom: spacing.xl,
     },
-    artwork: {
+    artworkShadow: {
         width: ARTWORK_SIZE,
         height: ARTWORK_SIZE,
         borderRadius: borderRadius.lg,
@@ -346,6 +418,11 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 16,
         elevation: 16,
+    },
+    artworkImage: {
+        width: ARTWORK_SIZE,
+        height: ARTWORK_SIZE,
+        borderRadius: borderRadius.lg,
     },
     artworkPlaceholder: {
         width: ARTWORK_SIZE,

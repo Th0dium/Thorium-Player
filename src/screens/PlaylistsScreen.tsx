@@ -23,9 +23,10 @@ import { spacing, typography, borderRadius } from '@/constants/theme';
 interface PlaylistsScreenProps {
     searchQuery?: string;
     onPlaylistPress?: (playlist: Playlist) => void;
+    onPlay?: () => void;
 }
 
-const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onPlaylistPress }) => {
+const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onPlaylistPress, onPlay }) => {
     const { colors } = useTheme();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -73,8 +74,9 @@ const PlaylistsScreen: React.FC<PlaylistsScreenProps> = ({ searchQuery = '', onP
                 id: playlist.id,
                 name: playlist.name,
             }, 0);
+            onPlay?.();
         }
-    }, [createQueue]);
+    }, [createQueue, onPlay]);
 
     const handlePlaylistPress = useCallback((playlist: Playlist) => {
         if (onPlaylistPress) {

@@ -75,7 +75,7 @@ const MasterLayout: React.FC = () => {
     const scrollRef = useRef<FlatList>(null);
     const scrollX = useRef(new Animated.Value(0)).current;
     const visibleTabs = MAIN_TABS;
-    const exitRef = useRef(false);
+    const lastBackButtonPress = useRef(0);
 
     // Handle tab press - scroll to page
     const handleTabPress = useCallback((tabId: TabId) => {
@@ -144,24 +144,22 @@ const MasterLayout: React.FC = () => {
                 return true;
             }
 
-            // 4. Tab Navigation
+            // 4. Tab Navigation (Back to Home/NowPlaying)
             if (activeTab !== 'nowPlaying') {
                 handleTabPress('nowPlaying');
                 return true;
             }
 
-            // 5. Exit confirmation
-            if (exitRef.current) {
+            // 5. Double-press Exit logic (The "Popular Way")
+            const now = Date.now();
+            if (now - lastBackButtonPress.current < 2000) {
                 BackHandler.exitApp();
                 return true;
-            } else {
-                exitRef.current = true;
-                showToast('Press back again to exit', 'info');
-                setTimeout(() => {
-                    exitRef.current = false;
-                }, 2000);
-                return true;
             }
+
+            lastBackButtonPress.current = now;
+            showToast('Press back again to exit', 'info');
+            return true;
         };
 
         const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
@@ -185,9 +183,14 @@ const MasterLayout: React.FC = () => {
         const showMiniPlayerInPage = hasCurrentTrack && tabId !== 'nowPlaying';
         const totalMiniPlayerHeight = MINI_PLAYER_HEIGHT + insets.bottom;
 
+        const handleSongSelect = () => {
+            handleTabPress('nowPlaying');
+        };
+
         const screenProps = {
             searchQuery,
             isSearchActive: isSearchVisible && searchQuery.length > 0 && activeTab === tabId,
+            onPlay: handleSongSelect,
         };
 
         const renderMiniPlayer = () => {
@@ -226,6 +229,7 @@ const MasterLayout: React.FC = () => {
                         searchQuery={searchQuery}
                         isSearchActive={isSearchVisible && searchQuery.length > 0}
                         onBack={handleLibraryBack}
+                        onPlay={handleSongSelect}
                     />
                 );
             } else {
@@ -246,6 +250,7 @@ const MasterLayout: React.FC = () => {
                             searchQuery={searchQuery}
                             isSearchActive={isSearchVisible && searchQuery.length > 0}
                             onBack={handleLibraryBack}
+                            onPlay={handleSongSelect}
                         />
                     );
                 }
@@ -257,6 +262,10 @@ const MasterLayout: React.FC = () => {
                 case 'queue': content = <QueueScreen {...screenProps} />; break;
                 case 'nowPlaying': content = <NowPlayingScreen />; break;
                 case 'library': content = <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />; break;
+                case 'folders': content = <FoldersScreen {...screenProps} />; break;
+                case 'playlists': content = <PlaylistsScreen {...screenProps} onPlaylistPress={(p) => handleLibraryNavigate(`playlist-${p.id}`, {title: p.name})} />; break;
+                case 'genres': content = <GenresScreen {...screenProps} onGenrePress={(g) => handleLibraryNavigate(`genre-${g.id}`, {title: g.name})} />; break;
+                case 'songs': content = <SongsScreen {...screenProps} />; break;
                 default: content = <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />;
             }
         }
@@ -342,8 +351,9 @@ const MasterLayout: React.FC = () => {
                         offset: SCREEN_WIDTH * index,
                         index,
                     })}
-                    windowSize={3}
-                    removeClippedSubviews={Platform.OS === 'android'}
+                    windowSize={visibleTabs.length}
+                    initialNumToRender={visibleTabs.length}
+                    removeClippedSubviews={false}
                     scrollEventThrottle={16}
                 />
             </View>

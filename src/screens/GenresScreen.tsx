@@ -19,9 +19,10 @@ import { spacing, typography, borderRadius } from '@/constants/theme';
 interface GenresScreenProps {
     searchQuery?: string;
     onGenrePress?: (genre: Genre) => void;
+    onPlay?: () => void;
 }
 
-const GenresScreen: React.FC<GenresScreenProps> = ({ searchQuery = '', onGenrePress }) => {
+const GenresScreen: React.FC<GenresScreenProps> = ({ searchQuery = '', onGenrePress, onPlay }) => {
     const { colors } = useTheme();
 
     const genres = useLibraryStore(state => state.genres);
@@ -52,8 +53,9 @@ const GenresScreen: React.FC<GenresScreenProps> = ({ searchQuery = '', onGenrePr
                 type: 'genre',
                 name: genre.name,
             }, 0);
+            onPlay?.();
         }
-    }, [createQueue]);
+    }, [createQueue, onPlay]);
 
     // Genre icon mapping
     const getGenreIcon = (name: string): string => {

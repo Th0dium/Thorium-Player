@@ -26,9 +26,10 @@ type SortOption = 'title' | 'artist' | 'album' | 'dateAdded' | 'duration';
 
 interface SongsScreenProps {
     searchQuery?: string;
+    onPlay?: () => void;
 }
 
-const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '' }) => {
+const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) => {
     const { colors } = useTheme();
     const flatListRef = useRef<FlatList>(null);
     const [sortBy, setSortBy] = useState<SortOption>('title');
@@ -130,7 +131,8 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '' }) => {
             type: 'all',
             name: searchQuery ? 'Search Results' : 'All Songs',
         }, index);
-    }, [filteredAndSortedTracks, isSelectionMode, searchQuery, createQueue]);
+        onPlay?.();
+    }, [filteredAndSortedTracks, isSelectionMode, searchQuery, createQueue, onPlay]);
 
     const handleTrackLongPress = useCallback((track: Track) => {
         setIsSelectionMode(true);
