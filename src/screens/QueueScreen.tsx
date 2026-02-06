@@ -54,23 +54,38 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [editingName, setEditingName] = useState('');
 
     // Scroll to current index when queue changes or initial load
+    const scrollToCurrentTrack = useCallback(() => {
+        if (!currentQueue || currentQueue.trackIds.length === 0 || currentIndex < 0) return;
+
+        // Map currentIndex (position in queue.trackIds) to actual position in rendered list
+        // This is needed because queueTracks filters out missing tracks
+        const currentTrackId = currentQueue.trackIds[currentIndex];
+        const visualIndex = filteredTracks.findIndex(t => t.id === currentTrackId);
+
+        if (visualIndex === -1) return; // Track not found in filtered list
+
+        // viewPosition: 0 puts the current track at the top of the list
+        requestAnimationFrame(() => {
+            flatListRef.current?.scrollToIndex({
+                index: visualIndex,
+                animated: true,
+                viewPosition: 0,
+            });
+        });
+    }, [currentQueue, currentIndex, filteredTracks]);
+
     useEffect(() => {
         if (currentQueue && currentQueue.trackIds.length > 0 && currentIndex >= 0) {
-            // Small timeout to ensure layout is complete
-            setTimeout(() => {
-                flatListRef.current?.scrollToIndex({
-                    index: currentIndex,
-                    animated: true,
-                    viewPosition: 0.3, // Show a bit of context above
-                });
-            }, 500);
+            // Delay to ensure all items are rendered and measured
+            const timer = setTimeout(scrollToCurrentTrack, 100);
+            return () => clearTimeout(timer);
         }
-    }, [currentQueue?.id, currentIndex]); // Only scroll when queue ID or index changes
+    }, [currentQueue?.id, currentIndex, scrollToCurrentTrack]);
 
     // Get tracks from current queue
     const queueTracks = useMemo(() => {
         if (!currentQueue || currentQueue.trackIds.length === 0) return [];
-        
+
         // Use a Map for O(1) lookups
         const trackMap = new Map(tracks.map(t => [t.id, t]));
         return currentQueue.trackIds
@@ -184,11 +199,11 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         return queues.map((queue, index) => {
             const hasContent = queue.trackIds.length > 0;
             if (!hasContent) return { queue, index, duration: '0s', trackCount: 0 };
-            
+
             const qTracks = queue.trackIds
                 .map(id => trackMap.get(id))
                 .filter((t): t is Track => t !== undefined);
-                
+
             return {
                 queue,
                 index,
@@ -408,19 +423,27 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 120 }}
                     activationDistance={10}
-                    getItemLayout={(_, index) => ({
-                        length: 72, // Approximate height of TrackListItem (padding + content)
-                        offset: 72 * index,
-                        index,
-                    })}
+                    // Render all items upfront so heights are measured
+                    // This makes scrollToIndex work perfectly without height calculations
+                    initialNumToRender={Math.min(filteredTracks.length, 100)}
+                    maxToRenderPerBatch={50}
+                    windowSize={21}
+                    removeClippedSubviews={false}
                     onScrollToIndexFailed={(info) => {
-                        setTimeout(() => {
-                            flatListRef.current?.scrollToIndex({
-                                index: info.index,
-                                animated: true,
-                                viewPosition: 0.3,
-                            });
-                        }, 500);
+                        // Fallback: scroll to offset, wait for render, then retry
+                        flatListRef.current?.scrollToOffset({
+                            offset: info.averageItemLength * info.index,
+                            animated: false,
+                        });
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                flatListRef.current?.scrollToIndex({
+                                    index: info.index,
+                                    animated: true,
+                                    viewPosition: 0, // Match the viewPosition used in main scroll
+                                });
+                            }, 100);
+                        });
                     }}
                 />
             ) : (
