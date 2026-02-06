@@ -75,6 +75,8 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     }, [queueTracks, searchQuery, isSearchActive]);
 
     // Scroll to current index when queue changes or initial load
+    // CRITICAL: This relies on all items being rendered upfront (see FlatList config below)
+    // so that scrollToIndex has accurate height measurements. Without this, scroll position mismatches occur.
     const scrollToCurrentTrack = useCallback(() => {
         if (!currentQueue || currentQueue.trackIds.length === 0 || currentIndex < 0) return;
 
@@ -423,15 +425,18 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 120 }}
                     activationDistance={10}
-                    initialNumToRender={15}
-                    maxToRenderPerBatch={10}
-                    windowSize={7}
-                    removeClippedSubviews={true}
-                    getItemLayout={(_, index) => ({
-                        length: 64,
-                        offset: 64 * index,
-                        index,
-                    })}
+                    // SCROLL POSITION FIX: "Magical" solution
+                    // Problem: Aggressive rendering optimization caused scroll position mismatches.
+                    // When scrollToIndex() was called, not all items were rendered yet, so RN couldn't
+                    // calculate accurate scroll offsets. Using hardcoded getItemLayout with 64px heights
+                    // also failed because actual item heights varied.
+                    // Solution: Render all items upfront (up to 100) and measure their real heights.
+                    // This ensures scrollToIndex has accurate data for perfect positioning.
+                    // Trade-off: Uses more memory initially, but queue sizes are typically small.
+                    initialNumToRender={Math.min(filteredTracks.length, 100)}
+                    maxToRenderPerBatch={50}
+                    windowSize={21}
+                    removeClippedSubviews={false}
                     onScrollToIndexFailed={(info) => {
                         // Fallback: scroll to offset, wait for render, then retry
                         flatListRef.current?.scrollToOffset({
