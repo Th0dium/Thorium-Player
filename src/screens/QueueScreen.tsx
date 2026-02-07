@@ -53,6 +53,9 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
     const [editingName, setEditingName] = useState('');
 
+    // Track measured heights of rendered items for accurate scrollToIndex
+    const itemHeights = useRef(new Map<number, number>());
+
     // Get tracks from current queue — must come before scrollToCurrentTrack
     const queueTracks = useMemo(() => {
         if (!currentQueue || currentQueue.trackIds.length === 0) return [];
@@ -75,8 +78,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     }, [queueTracks, searchQuery, isSearchActive]);
 
     // Scroll to current index when queue changes or initial load
-    // CRITICAL: This relies on all items being rendered upfront (see FlatList config below)
-    // so that scrollToIndex has accurate height measurements. Without this, scroll position mismatches occur.
+    // Works with dynamic height measurement via onLayout callbacks
     const scrollToCurrentTrack = useCallback(() => {
         if (!currentQueue || currentQueue.trackIds.length === 0 || currentIndex < 0) return;
 
@@ -86,6 +88,13 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         const visualIndex = filteredTracks.findIndex(t => t.id === currentTrackId);
 
         if (visualIndex === -1) return; // Track not found in filtered list
+
+        // Check if this item's height has been measured
+        if (!itemHeights.current.has(visualIndex)) {
+            // Item not yet rendered/measured, try again with a small delay
+            setTimeout(scrollToCurrentTrack, 50);
+            return;
+        }
 
         // viewPosition: 0 puts the current track at the top of the list
         requestAnimationFrame(() => {
@@ -99,9 +108,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
 
     useEffect(() => {
         if (currentQueue && currentQueue.trackIds.length > 0 && currentIndex >= 0) {
-            // Delay to ensure all items are rendered and measured
-            const timer = setTimeout(scrollToCurrentTrack, 100);
-            return () => clearTimeout(timer);
+            scrollToCurrentTrack();
         }
     }, [currentQueue?.id, currentIndex, scrollToCurrentTrack]);
 
@@ -228,6 +235,19 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         moveInQueue(from, to);
     }, [moveInQueue, isSearchActive, searchQuery]);
 
+    // Compute layout based on measured heights, with fallback to average
+    const getItemLayout = useCallback((data: any, index: number) => {
+        const height = itemHeights.current.get(index) || 80; // Fallback to ~80px if not measured yet
+        let offset = 0;
+
+        // Sum heights of all previous items
+        for (let i = 0; i < index; i++) {
+            offset += itemHeights.current.get(i) || 80;
+        }
+
+        return { length: height, offset, index };
+    }, []);
+
     const handleTrackPress = useCallback(async (filteredIndex: number) => {
         // Map filtered index back to full queue index when search is active
         let realIndex = filteredIndex;
@@ -261,17 +281,26 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         const isSearching = isSearchActive && !!searchQuery;
 
         return (
-            <View style={isDragging ? {
-                elevation: 8,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                transform: [{ scale: 1.03 }],
-                zIndex: 999,
-                borderRadius: 8,
-                opacity: 0.95,
-            } : undefined}>
+            <View 
+                style={isDragging ? {
+                    elevation: 8,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    transform: [{ scale: 1.03 }],
+                    zIndex: 999,
+                    borderRadius: 8,
+                    opacity: 0.95,
+                } : undefined}
+                onLayout={(e) => {
+                    // Measure and store the actual height of this item
+                    const height = e.nativeEvent.layout.height;
+                    if (height > 0) {
+                        itemHeights.current.set(filteredIndex, height);
+                    }
+                }}
+            >
                 <TrackListItem
                     track={item}
                     index={realIndex}
@@ -425,18 +454,14 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 120 }}
                     activationDistance={10}
-                    // SCROLL POSITION FIX: "Magical" solution
-                    // Problem: Aggressive rendering optimization caused scroll position mismatches.
-                    // When scrollToIndex() was called, not all items were rendered yet, so RN couldn't
-                    // calculate accurate scroll offsets. Using hardcoded getItemLayout with 64px heights
-                    // also failed because actual item heights varied.
-                    // Solution: Render all items upfront (up to 100) and measure their real heights.
-                    // This ensures scrollToIndex has accurate data for perfect positioning.
-                    // Trade-off: Uses more memory initially, but queue sizes are typically small.
-                    initialNumToRender={Math.min(filteredTracks.length, 100)}
-                    maxToRenderPerBatch={50}
-                    windowSize={21}
-                    removeClippedSubviews={false}
+                    // Dynamic height measurement (onLayout) enables aggressive lazy rendering
+                    // Items report their height as they render, populating itemHeights Map
+                    // getItemLayout uses these real measurements for accurate scrollToIndex
+                    initialNumToRender={15}
+                    maxToRenderPerBatch={10}
+                    windowSize={7}
+                    removeClippedSubviews={true}
+                    getItemLayout={getItemLayout}
                     onScrollToIndexFailed={(info) => {
                         // Fallback: scroll to offset, wait for render, then retry
                         flatListRef.current?.scrollToOffset({
@@ -448,7 +473,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                                 flatListRef.current?.scrollToIndex({
                                     index: info.index,
                                     animated: true,
-                                    viewPosition: 0, // Match the viewPosition used in main scroll
+                                    viewPosition: 0,
                                 });
                             }, 100);
                         });

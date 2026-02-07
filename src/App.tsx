@@ -1,6 +1,6 @@
 // App Entry Point - Main application component
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, StatusBar, Platform, PermissionsAndroid } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Navigation from '@/navigation/Navigation';
@@ -64,6 +64,23 @@ const App: React.FC = () => {
     const initializeApp = async () => {
         try {
             console.log('[App] Starting initialization...');
+
+            // Request notification permission FIRST (Android 13+/API 33+)
+            // Must happen before TrackPlayer.setupPlayer() so the foreground service
+            // notification is allowed to display from the very first playback
+            if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
+                console.log('[App] Requesting notification permission...');
+                const result = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+                    {
+                        title: 'Playback Notification',
+                        message: 'Thorium needs notification access to show playback controls when playing music.',
+                        buttonPositive: 'Allow',
+                        buttonNegative: 'Deny',
+                    }
+                );
+                console.log('[App] Notification permission:', result);
+            }
 
             // Initialize database
             console.log('[App] Initializing database...');

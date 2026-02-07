@@ -36,22 +36,40 @@ class AudioService {
         await TrackPlayer.updateOptions({
             android: {
                 appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
+                alwaysPauseOnInterruption: true,
             },
+            // Notification color (ARGB hex) — top-level property per RNTP docs
+            color: 0xFF7C4DFF, // Primary purple with full opacity
+            // Capabilities that will be available in the notification
             capabilities: [
                 Capability.Play,
                 Capability.Pause,
-                Capability.Stop,
                 Capability.SkipToNext,
                 Capability.SkipToPrevious,
                 Capability.SeekTo,
-                Capability.SetRating,
+                Capability.JumpForward,
+                Capability.JumpBackward,
             ],
+            // Explicitly set notification capabilities (defaults to capabilities if omitted,
+            // but being explicit ensures the notification buttons render)
+            notificationCapabilities: [
+                Capability.Play,
+                Capability.Pause,
+                Capability.SkipToNext,
+                Capability.SkipToPrevious,
+                Capability.JumpForward,
+                Capability.JumpBackward,
+            ],
+            // Capabilities that will be displayed when the notification is in compact form
             compactCapabilities: [
                 Capability.Play,
                 Capability.Pause,
                 Capability.SkipToNext,
                 Capability.SkipToPrevious,
             ],
+            // Seek/Jump intervals
+            forwardJumpInterval: 30,
+            backwardJumpInterval: 15,
             progressUpdateEventInterval: 1,
         });
 

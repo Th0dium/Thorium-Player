@@ -27,31 +27,41 @@ const PermissionScreen: React.FC<PermissionScreenProps> = ({ onNext, onBack }) =
     const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('undetermined');
     const [isRequesting, setIsRequesting] = useState(false);
 
-    const getRequiredPermission = useCallback(() => {
-        if (Platform.OS !== 'android') return null;
+    const getRequiredPermissions = useCallback(() => {
+        if (Platform.OS !== 'android') return [];
         const sdkInt = Platform.Version as number;
-        return sdkInt >= 33
-            ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO
-            : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+        const permissions = [];
+        
+        if (sdkInt >= 33) {
+            permissions.push(PermissionsAndroid.PERMISSIONS.READ_MEDIA_AUDIO);
+            permissions.push(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        } else {
+            permissions.push(PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE);
+        }
+        
+        return permissions;
     }, []);
 
     const checkPermission = useCallback(async () => {
         try {
             if (Platform.OS === 'ios') {
-                // iOS doesn't require explicit permission for music library in most cases
                 setPermissionStatus('granted');
                 return;
             }
 
-            const permission = getRequiredPermission();
-            if (!permission) return;
+            const permissions = getRequiredPermissions();
+            if (permissions.length === 0) return;
 
-            const isGranted = await PermissionsAndroid.check(permission);
-            setPermissionStatus(isGranted ? 'granted' : 'undetermined');
+            const results = await Promise.all(
+                permissions.map(p => PermissionsAndroid.check(p))
+            );
+            
+            const allGranted = results.every(result => result === true);
+            setPermissionStatus(allGranted ? 'granted' : 'undetermined');
         } catch (error) {
             console.error('[Permission] Error checking permission:', error);
         }
-    }, [getRequiredPermission]);
+    }, [getRequiredPermissions]);
 
     // Check permission on mount
     useEffect(() => {
@@ -81,31 +91,29 @@ const PermissionScreen: React.FC<PermissionScreenProps> = ({ onNext, onBack }) =
                 return;
             }
 
-            const permission = getRequiredPermission();
-            if (!permission) {
+            const permissions = getRequiredPermissions();
+            if (permissions.length === 0) {
                 setIsRequesting(false);
                 return;
             }
 
-            const result = await PermissionsAndroid.request(permission, {
-                title: 'Audio File Access',
-                message: 'Thorium needs access to your audio files to build your music library.',
-                buttonPositive: 'Allow',
-                buttonNegative: 'Deny',
-            });
+            const results = await PermissionsAndroid.requestMultiple(permissions);
+            console.log('[Permission] Request results:', results);
 
-            console.log('[Permission] Request result:', result);
+            const allGranted = permissions.every(
+                p => results[p] === PermissionsAndroid.RESULTS.GRANTED
+            );
+            
+            const anyBlocked = permissions.some(
+                p => results[p] === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN
+            );
 
-            switch (result) {
-                case PermissionsAndroid.RESULTS.GRANTED:
-                    setPermissionStatus('granted');
-                    break;
-                case PermissionsAndroid.RESULTS.DENIED:
-                    setPermissionStatus('denied');
-                    break;
-                case PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN:
-                    setPermissionStatus('blocked');
-                    break;
+            if (allGranted) {
+                setPermissionStatus('granted');
+            } else if (anyBlocked) {
+                setPermissionStatus('blocked');
+            } else {
+                setPermissionStatus('denied');
             }
         } catch (error) {
             console.error('[Permission] Error requesting permission:', error);
@@ -222,14 +230,14 @@ const PermissionScreen: React.FC<PermissionScreenProps> = ({ onNext, onBack }) =
                 {/* What we access info */}
                 {permissionStatus !== 'granted' && (
                     <View style={styles.infoBox}>
-                        <Text style={styles.infoTitle}>What Thorium accesses:</Text>
+                        <Text style={styles.infoTitle}>Thorium needs access to:</Text>
                         <View style={styles.infoItem}>
                             <Icon name="music-note" size={18} color={colors.primary} />
-                            <Text style={styles.infoText}>Audio files (MP3, FLAC, etc.)</Text>
+                            <Text style={styles.infoText}>Audio files & metadata</Text>
                         </View>
                         <View style={styles.infoItem}>
-                            <Icon name="tag" size={18} color={colors.primary} />
-                            <Text style={styles.infoText}>Music metadata (artist, album, etc.)</Text>
+                            <Icon name="bell-outline" size={18} color={colors.primary} />
+                            <Text style={styles.infoText}>Playback notifications</Text>
                         </View>
                         <View style={styles.infoItem}>
                             <Icon name="image" size={18} color={colors.primary} />

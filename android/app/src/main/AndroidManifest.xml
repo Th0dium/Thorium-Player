@@ -16,10 +16,12 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     
     <!-- Service permissions for background playback -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
       android:name=".MainApplication"
@@ -40,5 +42,14 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <service android:name="com.doublesymmetry.trackplayer.service.MusicService"
+               android:exported="true"
+               android:foregroundServiceType="mediaPlayback">
+          <intent-filter>
+              <action android:name="android.intent.action.MEDIA_BUTTON" />
+              <action android:name="android.media.browse.MediaBrowserService" />
+          </intent-filter>
+      </service>
     </application>
 </manifest>
