@@ -14,103 +14,44 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
-import { fileSystemService } from '@/services/FileSystemService';
 import FolderBrowser from '@/components/FolderBrowser';
+import { FolderList } from '@/components/FolderList';
+import { useFolderDetection } from '@/hooks/useFolderDetection';
 
 interface ScannerSetupScreenProps {
     onNext: (settings: any) => void;
     onBack: () => void;
 }
 
-interface DetectedFolder {
-    path: string;
-    name: string;
-    selected: boolean;
-    estimatedCount?: number;
-}
-
 const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack }) => {
-    const [isScanning, setIsScanning] = useState(false);
-    const [detectedFolders, setDetectedFolders] = useState<DetectedFolder[]>([]);
     const [excludeRingtones, setExcludeRingtones] = useState(true);
     const [excludeNotifications, setExcludeNotifications] = useState(true);
     const [excludeShortFiles, setExcludeShortFiles] = useState(true);
     const [minDuration, setMinDuration] = useState(30); // seconds
     const [showFolderBrowser, setShowFolderBrowser] = useState(false);
 
+    const {
+        isScanning,
+        detectedFolders,
+        addFolder,
+        removeFolder,
+        getSelectedPaths,
+        detectMusicFolders,
+    } = useFolderDetection();
+
+    // Detect folders on mount
     useEffect(() => {
         detectMusicFolders();
     }, []);
-
-    const detectMusicFolders = async () => {
-        setIsScanning(true);
-        try {
-            // Common music directories
-            const commonPaths = [
-                '/storage/emulated/0/Music',
-                '/storage/emulated/0/Download',
-                '/storage/emulated/0/Downloads',
-                '/storage/emulated/0/DCIM',
-                '/storage/emulated/0/Podcasts',
-            ];
-
-            const folders: DetectedFolder[] = [];
-            for (const path of commonPaths) {
-                try {
-                    const exists = await fileSystemService.exists(path);
-                    if (exists) {
-                        folders.push({
-                            path,
-                            name: path.split('/').pop() || path,
-                            selected: path.includes('Music'),
-                        });
-                    }
-                } catch (e) {
-                    // Folder doesn't exist or no access
-                }
-            }
-
-            setDetectedFolders(folders);
-        } catch (error) {
-            console.error('Error detecting folders:', error);
-        }
-        setIsScanning(false);
-    };
-
-    const toggleFolder = (index: number) => {
-        setDetectedFolders(prev =>
-            prev.map((folder, i) =>
-                i === index ? { ...folder, selected: !folder.selected } : folder
-            )
-        );
-    };
-
     const handleManualFolderSelect = (path: string) => {
-        // Add the selected folder if not already in list
-        const exists = detectedFolders.some(f => f.path === path);
-        if (!exists) {
-            const folderName = path.split('/').pop() || path;
-            setDetectedFolders([
-                ...detectedFolders,
-                {
-                    path,
-                    name: folderName,
-                    selected: true,
-                    estimatedCount: 0,
-                }
-            ]);
-        }
+        addFolder(path);
         setShowFolderBrowser(false);
-    };
-
-    const removeFolder = (index: number) => {
-        setDetectedFolders(prev => prev.filter((_, i) => i !== index));
     };
 
     const handleContinue = () => {
         // Save settings to store/database
         const settings = {
-            folderPaths: detectedFolders.filter(f => f.selected).map(f => f.path),
+            folderPaths: detectedFolders.map(f => f.path),
             excludeRingtones,
             excludeNotifications,
             excludeShortFiles,
@@ -147,61 +88,14 @@ const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack 
                 <View style={styles.foldersSection}>
                     <View style={styles.sectionHeader}>
                         <Text style={styles.sectionTitle}>Music Folders</Text>
-                        <TouchableOpacity
-                            style={styles.addFolderButton}
-                            onPress={() => setShowFolderBrowser(true)}
-                        >
-                            <Icon name="plus" size={20} color={colors.background} />
-                            <Text style={styles.addFolderButtonText}>Add</Text>
-                        </TouchableOpacity>
                     </View>
 
-                    {isScanning ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color={colors.primary} />
-                            <Text style={styles.loadingText}>Scanning for music folders...</Text>
-                        </View>
-                    ) : detectedFolders.length > 0 ? (
-                        detectedFolders.map((folder, index) => (
-                            <View key={folder.path} style={styles.folderItem}>
-                                <TouchableOpacity
-                                    style={styles.folderCheckbox}
-                                    onPress={() => toggleFolder(index)}
-                                >
-                                    <Icon
-                                        name={folder.selected ? "checkbox-marked" : "checkbox-blank-outline"}
-                                        size={24}
-                                        color={folder.selected ? colors.primary : colors.textSecondary}
-                                    />
-                                </TouchableOpacity>
-                                <View style={styles.folderInfo}>
-                                    <View style={styles.folderTextContainer}>
-                                        <Icon name="folder-music" size={20} color={colors.primary} />
-                                        <Text style={styles.folderName}>{folder.name}</Text>
-                                    </View>
-                                    <Text style={styles.folderPath} numberOfLines={1}>
-                                        {folder.path}
-                                    </Text>
-                                </View>
-                                <TouchableOpacity
-                                    style={styles.removeFolderButton}
-                                    onPress={() => removeFolder(index)}
-                                >
-                                    <Icon name="close" size={20} color={colors.error} />
-                                </TouchableOpacity>
-                            </View>
-                        ))
-                    ) : (
-                        <View style={styles.emptyFoldersContainer}>
-                            <Icon name="folder-open" size={40} color={colors.textSecondary} />
-                            <Text style={styles.emptyFoldersText}>
-                                No folders selected yet
-                            </Text>
-                            <Text style={styles.emptyFoldersSubtext}>
-                                Tap "Add" to select where your music is stored
-                            </Text>
-                        </View>
-                    )}
+                    <FolderList
+                        folders={detectedFolders}
+                        isScanning={isScanning}
+                        onRemoveFolder={removeFolder}
+                        onAddCustomFolder={() => setShowFolderBrowser(true)}
+                    />
                 </View>
 
                 {/* Filter Options */}
