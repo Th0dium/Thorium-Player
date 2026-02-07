@@ -1,7 +1,8 @@
 // Theme Provider - Dynamic theme support based on user preferences
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, useContext, useMemo, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { useSettingsStore, ThemeOption } from '@/store/settingsStore';
+import { audioService } from '@/services/AudioService';
 
 // Dark theme colors (default)
 const darkColors = {
@@ -204,6 +205,12 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         isDark,
         theme: themePreference,
     }), [colors, isDark, themePreference]);
+
+    useEffect(() => {
+        audioService.updateNotificationOptions(isDark).catch(e =>
+            console.warn('[ThemeProvider] Failed to update notification options:', e)
+        );
+    }, [isDark]);
 
     return (
         <ThemeContext.Provider value={value}>

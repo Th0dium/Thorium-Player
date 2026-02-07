@@ -32,9 +32,10 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 interface QueueScreenProps {
     searchQuery?: string;
     isSearchActive?: boolean;
+    isFocused?: boolean;
 }
 
-const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchActive = false }) => {
+const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchActive = false, isFocused = false }) => {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList<any>>(null);
@@ -107,10 +108,10 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     }, [currentQueue, currentIndex, filteredTracks]);
 
     useEffect(() => {
-        if (currentQueue && currentQueue.trackIds.length > 0 && currentIndex >= 0) {
+        if (isFocused && currentQueue && currentQueue.trackIds.length > 0 && currentIndex >= 0) {
             scrollToCurrentTrack();
         }
-    }, [currentQueue?.id, currentIndex, scrollToCurrentTrack]);
+    }, [isFocused, currentQueue?.id, currentIndex, scrollToCurrentTrack]);
 
     const handleSwitchQueue = useCallback((index: number) => {
         switchQueue(index);

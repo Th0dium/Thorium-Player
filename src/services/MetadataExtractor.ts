@@ -97,6 +97,11 @@ class MetadataExtractor {
         const filePath = file.path || file.url || '';
         const fileName = file.fileName || filePath.substring(filePath.lastIndexOf('/') + 1);
 
+        let albumArt = file.cover || file.artwork;
+        if (albumArt && Platform.OS === 'android' && !albumArt.startsWith('file://') && !albumArt.startsWith('http') && !albumArt.startsWith('content://') && !albumArt.startsWith('data:')) {
+            albumArt = `file://${albumArt}`;
+        }
+
         return {
             id: this.generateId(filePath),
             path: filePath,
@@ -105,7 +110,7 @@ class MetadataExtractor {
             artist: file.artist || file.author || 'Unknown Artist',
             album: file.album || 'Unknown Album',
             duration: durationSeconds,
-            albumArt: file.cover || file.artwork,
+            albumArt,
             genre: file.genre,
             playCount: 0,
             bookmarks: [],

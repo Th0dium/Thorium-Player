@@ -1,4 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#7C4DFF</color>
+    
+    <!-- Primary brand colors - Purple -->
+    <color name="primary">#7C4DFF</color>
+    <color name="primary_dark">#3F1DCB</color>
+    <color name="primary_light">#B47CFF</color>
+    
+    <!-- Accent color - Cyan -->
+    <color name="accent">#00E5FF</color>
 </resources>

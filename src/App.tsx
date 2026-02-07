@@ -87,15 +87,15 @@ const App: React.FC = () => {
             await databaseService.initialize();
             console.log('[App] Database initialized');
 
-            // Initialize audio player
-            console.log('[App] Initializing audio player...');
-            await initializePlayer();
-            console.log('[App] Audio player initialized');
-
             // Load UI settings from settingsStore
             console.log('[App] Loading UI settings...');
             await loadSettings();
             console.log('[App] UI settings loaded');
+
+            // Initialize audio player
+            console.log('[App] Initializing audio player...');
+            await initializePlayer();
+            console.log('[App] Audio player initialized');
 
             // Load settings and configure AI services
             console.log('[App] Loading app settings...');

@@ -192,6 +192,7 @@ const MasterLayout: React.FC = () => {
             searchQuery,
             isSearchActive: isSearchVisible && searchQuery.length > 0 && activeTab === tabId,
             onPlay: handleSongSelect,
+            isFocused: activeTab === tabId,
         };
 
         const renderMiniPlayer = () => {

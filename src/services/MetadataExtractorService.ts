@@ -114,6 +114,11 @@ class MetadataExtractorService {
      * Map react-native-get-music-files format to our metadata format
      */
     private mapMusicFileToMetadata(file: any, filePath: string): AudioMetadata {
+        let artwork = file.cover || file.artwork || undefined;
+        if (artwork && !artwork.startsWith('file://') && !artwork.startsWith('http') && !artwork.startsWith('content://') && !artwork.startsWith('data:')) {
+            artwork = `file://${artwork}`;
+        }
+
         // Song interface uses 'cover' not 'artwork'
         return {
             path: filePath,
@@ -121,7 +126,7 @@ class MetadataExtractorService {
             artist: file.artist || 'Unknown Artist',
             album: file.album || 'Unknown Album',
             duration: file.duration ? Math.round(file.duration) : 0, // Convert to ms if needed
-            artwork: file.cover || file.artwork || undefined,
+            artwork,
             genre: file.genre || undefined,
             year: file.year ? parseInt(file.year) : undefined,
             albumArtist: file.album_artist || undefined,

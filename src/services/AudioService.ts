@@ -33,13 +33,27 @@ class AudioService {
             backBuffer: 2.5, // Keep 2.5s behind current position
         });
 
+        await this.updateNotificationOptions();
+
+        this.isInitialized = true;
+    }
+
+    /**
+     * Update notification options based on current theme/settings
+     */
+    async updateNotificationOptions(isDark: boolean = true): Promise<void> {
+        // Use a dark color for background/accent in dark mode, or system default
+        const notificationColor = isDark ? 0x0D0D0D : 0xFAFAFA;
+
         await TrackPlayer.updateOptions({
             android: {
                 appKilledPlaybackBehavior: AppKilledPlaybackBehavior.ContinuePlayback,
                 alwaysPauseOnInterruption: true,
             },
-            // Notification color (ARGB hex) — top-level property per RNTP docs
-            color: 0xFF7C4DFF, // Primary purple with full opacity
+            // Color for the notification icons/accent
+            color: notificationColor,
+            // Small icon for the notification - using name of resource in android/app/src/main/res/drawable
+            icon: 'ic_notification' as any,
             // Capabilities that will be available in the notification
             capabilities: [
                 Capability.Play,
@@ -49,16 +63,7 @@ class AudioService {
                 Capability.SeekTo,
                 Capability.JumpForward,
                 Capability.JumpBackward,
-            ],
-            // Explicitly set notification capabilities (defaults to capabilities if omitted,
-            // but being explicit ensures the notification buttons render)
-            notificationCapabilities: [
-                Capability.Play,
-                Capability.Pause,
-                Capability.SkipToNext,
-                Capability.SkipToPrevious,
-                Capability.JumpForward,
-                Capability.JumpBackward,
+                Capability.Stop,
             ],
             // Capabilities that will be displayed when the notification is in compact form
             compactCapabilities: [
@@ -72,8 +77,6 @@ class AudioService {
             backwardJumpInterval: 15,
             progressUpdateEventInterval: 1,
         });
-
-        this.isInitialized = true;
     }
 
     // Playback controls
