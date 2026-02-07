@@ -23,7 +23,7 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
 import TrackListItem from '@/components/TrackListItem';
-import { Track, Queue } from '@/types';
+import { Track, Queue, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -47,12 +47,35 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const removeFromQueue = useQueueStore(state => state.removeFromQueue);
     const switchQueue = useQueueStore(state => state.switchQueue);
     const moveInQueue = useQueueStore(state => state.moveInQueue);
+    const sortQueue = useQueueStore(state => state.sortQueue);
     const skipToIndex = usePlayerStore(state => state.skipToIndex);
     const tracks = useLibraryStore(state => state.tracks);
 
     const [showQueueSwitcher, setShowQueueSwitcher] = useState(false);
     const [editingQueueIndex, setEditingQueueIndex] = useState<number | null>(null);
     const [editingName, setEditingName] = useState('');
+
+    // Sorting state
+    const [sortBy, setSortBy] = useState<SortOption>(currentQueue?.sortBy || 'title');
+    const [sortAsc, setSortAsc] = useState(currentQueue?.sortAsc ?? true);
+    const [showSortMenu, setShowSortMenu] = useState(false);
+
+    // Sync sorting state when queue changes
+    useEffect(() => {
+        if (currentQueue) {
+            setSortBy(currentQueue.sortBy || 'title');
+            setSortAsc(currentQueue.sortAsc ?? true);
+        }
+    }, [currentQueue?.id]);
+
+    const sortOptions: { key: SortOption; label: string; icon: string }[] = [
+        { key: 'title', label: 'Title', icon: 'sort-alphabetical-ascending' },
+        { key: 'artist', label: 'Artist', icon: 'account-music' },
+        { key: 'album', label: 'Album', icon: 'album' },
+        { key: 'dateAdded', label: 'Date Added', icon: 'calendar-plus' },
+        { key: 'duration', label: 'Duration', icon: 'clock-outline' },
+        { key: 'playCount', label: 'Play Count', icon: 'chart-bar' },
+    ];
 
     // Track measured heights of rendered items for accurate scrollToIndex
     const itemHeights = useRef(new Map<number, number>());
@@ -145,6 +168,22 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         setEditingQueueIndex(null);
         setEditingName('');
     }, [editingQueueIndex, editingName, queues]);
+
+    const handleSortOptionPress = useCallback(async (option: SortOption) => {
+        let newSortAsc = sortAsc;
+        if (sortBy === option) {
+            newSortAsc = !sortAsc;
+            setSortAsc(newSortAsc);
+        } else {
+            setSortBy(option);
+            newSortAsc = option === 'title' || option === 'artist' || option === 'album';
+            setSortAsc(newSortAsc);
+        }
+        setShowSortMenu(false);
+        
+        // Apply sorting to queue store
+        await sortQueue(option, newSortAsc);
+    }, [sortBy, sortAsc, sortQueue]);
 
     // Remove a single queue
     const handleRemoveQueue = useCallback((index: number, e?: any) => {
@@ -423,6 +462,21 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     </Text>
                     <Icon name="chevron-down" size={20} color={colors.textSecondary} />
                 </TouchableOpacity>
+
+                {currentQueue && queueTracks.length > 1 && (
+                    <TouchableOpacity
+                        style={[styles.sortToggleButton, { backgroundColor: colors.surface }]}
+                        onPress={() => setShowSortMenu(true)}
+                    >
+                        <Icon name="sort" size={20} color={colors.textSecondary} />
+                        <Icon 
+                            name={sortAsc ? 'arrow-up' : 'arrow-down'} 
+                            size={14} 
+                            color={colors.primary} 
+                            style={styles.sortArrow}
+                        />
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Queue Info Bar */}
@@ -561,6 +615,63 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     </View>
                 </TouchableOpacity>
             </Modal>
+
+            {/* Sort Menu Modal */}
+            <Modal
+                visible={showSortMenu}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowSortMenu(false)}
+            >
+                <TouchableOpacity 
+                    style={styles.modalOverlay} 
+                    activeOpacity={1}
+                    onPress={() => setShowSortMenu(false)}
+                >
+                    <View 
+                        style={[
+                            styles.sortMenu, 
+                            { 
+                                backgroundColor: colors.surfaceElevated,
+                                marginBottom: insets.bottom + 100 // Position above mini player
+                            }
+                        ]}
+                        onStartShouldSetResponder={() => true}
+                    >
+                        <Text style={[styles.menuTitle, { color: colors.textPrimary }]}>Sort Queue by</Text>
+                        {sortOptions.map((option) => (
+                            <TouchableOpacity
+                                key={option.key}
+                                style={[
+                                    styles.sortOption,
+                                    sortBy === option.key && { backgroundColor: colors.primary + '15' }
+                                ]}
+                                onPress={() => handleSortOptionPress(option.key)}
+                            >
+                                <Icon 
+                                    name={option.icon} 
+                                    size={20} 
+                                    color={sortBy === option.key ? colors.primary : colors.textSecondary} 
+                                />
+                                <Text style={[
+                                    styles.sortOptionLabel,
+                                    { color: sortBy === option.key ? colors.primary : colors.textPrimary }
+                                ]}>
+                                    {option.label}
+                                </Text>
+                                {sortBy === option.key && (
+                                    <Icon 
+                                        name={sortAsc ? 'arrow-up' : 'arrow-down'} 
+                                        size={18} 
+                                        color={colors.primary} 
+                                        style={{ marginLeft: 'auto' }}
+                                    />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </GestureHandlerRootView>
     );
 };
@@ -583,16 +694,33 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     header: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
+        gap: spacing.sm,
     },
     queueSwitcherButton: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
         borderRadius: borderRadius.md,
         gap: spacing.sm,
+    },
+    sortToggleButton: {
+        width: 44,
+        height: 44,
+        borderRadius: borderRadius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    sortArrow: {
+        position: 'absolute',
+        right: 6,
+        bottom: 8,
     },
     headerTitle: {
         flex: 1,
@@ -749,6 +877,33 @@ const styles = StyleSheet.create({
     },
     emptyQueueText: {
         fontSize: typography.sizes.md,
+    },
+    sortMenu: {
+        width: '80%',
+        borderRadius: borderRadius.lg,
+        paddingVertical: spacing.md,
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    menuTitle: {
+        fontSize: typography.sizes.md,
+        fontWeight: 'bold',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.sm,
+        marginBottom: spacing.xs,
+    },
+    sortOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.lg,
+        paddingVertical: spacing.md,
+    },
+    sortOptionLabel: {
+        fontSize: typography.sizes.md,
+        marginLeft: spacing.md,
     },
 });
 

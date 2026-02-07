@@ -1,6 +1,6 @@
 // Queue Store - Manages multiple playback queues (dynamic)
 import { create } from 'zustand';
-import { Queue, Track, QueueSource } from '@/types';
+import { Queue, Track, QueueSource, SortOption } from '@/types';
 import { databaseService } from '@/services/DatabaseService';
 import { audioService } from '@/services/AudioService';
 import { usePlayerStore } from './playerStore';
@@ -34,6 +34,7 @@ interface QueueStore {
     moveInCurrentQueue: (fromIndex: number, toIndex: number) => Promise<void>;
     moveInQueue: (fromIndex: number, toIndex: number) => Promise<void>; // Alias
     reorderQueue: (newTrackIds: string[]) => Promise<void>;
+    sortQueue: (sortBy: SortOption, sortAsc: boolean) => Promise<void>;
 
     // Index sync
     updateCurrentIndex: (index: number) => void;
@@ -393,6 +394,86 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         // Fire-and-forget persistence
         databaseService.saveQueue(updatedQueue).catch(e =>
             console.warn('[QueueStore] Failed to save queue:', e)
+        );
+    },
+
+    // Sort current queue by specific field
+    sortQueue: async (sortBy, sortAsc) => {
+        const { currentQueue, currentIndex } = get();
+        if (!currentQueue || currentQueue.trackIds.length <= 1) return;
+
+        // Get full tracks for sorting
+        const libraryTracks = useLibraryStore.getState().tracks;
+        const trackMap = new Map(libraryTracks.map(t => [t.id, t]));
+        const queueTracks = currentQueue.trackIds
+            .map(id => trackMap.get(id))
+            .filter((t): t is Track => t !== undefined);
+
+        if (queueTracks.length <= 1) return;
+
+        // Save current track and position to restore after sort
+        const currentTrackId = currentQueue.trackIds[currentIndex];
+        const currentPos = await audioService.getProgress().then(p => p.position).catch(() => 0);
+        const wasPlaying = usePlayerStore.getState().isPlaying;
+
+        // Perform sort
+        queueTracks.sort((a, b) => {
+            let comparison = 0;
+            switch (sortBy) {
+                case 'artist':
+                    comparison = (a.artist || '').localeCompare(b.artist || '');
+                    if (comparison === 0) comparison = (a.title || '').localeCompare(b.title || '');
+                    break;
+                case 'album':
+                    comparison = (a.album || '').localeCompare(b.album || '');
+                    if (comparison === 0) comparison = (a.title || '').localeCompare(b.title || '');
+                    break;
+                case 'dateAdded':
+                    comparison = (a.dateAdded || 0) - (b.dateAdded || 0);
+                    break;
+                case 'duration':
+                    comparison = (a.duration || 0) - (b.duration || 0);
+                    break;
+                case 'playCount':
+                    comparison = (a.playCount || 0) - (b.playCount || 0);
+                    break;
+                case 'title':
+                default:
+                    comparison = (a.title || '').localeCompare(b.title || '');
+            }
+            return sortAsc ? comparison : -comparison;
+        });
+
+        const newTrackIds = queueTracks.map(t => t.id);
+        const newCurrentIndex = newTrackIds.indexOf(currentTrackId);
+
+        // Update local state
+        const updatedQueue: Queue = { 
+            ...currentQueue, 
+            trackIds: newTrackIds, 
+            currentIndex: newCurrentIndex,
+            sortBy,
+            sortAsc
+        };
+        set({ currentQueue: updatedQueue, currentIndex: newCurrentIndex });
+
+        // Update audio service queue
+        await audioService.setQueue(queueTracks);
+        
+        // Restore position
+        if (newCurrentIndex !== -1) {
+            await audioService.skipToTrack(newCurrentIndex);
+            if (currentPos > 0) {
+                await audioService.seekTo(currentPos);
+            }
+            if (wasPlaying) {
+                await audioService.play();
+            }
+        }
+
+        // Persist
+        databaseService.saveQueue(updatedQueue).catch(e =>
+            console.warn('[QueueStore] Failed to save sorted queue:', e)
         );
     },
 

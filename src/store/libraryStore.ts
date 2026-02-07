@@ -33,6 +33,7 @@ interface LibraryStore {
     deletePlaylist: (id: string) => Promise<void>;
     addToPlaylist: (playlistId: string, trackIds: string[]) => Promise<void>;
     removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
+    reorderPlaylist: (playlistId: string, trackIds: string[]) => Promise<void>;
 }
 
 export const useLibraryStore = create<LibraryStore>((set, get) => {
@@ -332,6 +333,21 @@ export const useLibraryStore = create<LibraryStore>((set, get) => {
             // Persist in background
             databaseService.removeTrackFromPlaylist(playlistId, trackId).catch(e =>
                 console.warn('[LibraryStore] Failed to remove track from playlist:', e)
+            );
+        },
+
+        reorderPlaylist: async (playlistId, trackIds) => {
+            // Optimistic: update state immediately
+            set(state => ({
+                playlists: state.playlists.map(p =>
+                    p.id === playlistId
+                        ? { ...p, trackIds, updatedAt: Date.now() }
+                        : p
+                )
+            }));
+            // Persist in background
+            databaseService.updatePlaylist(playlistId, { trackIds }).catch(e =>
+                console.warn('[LibraryStore] Failed to reorder playlist:', e)
             );
         },
     };

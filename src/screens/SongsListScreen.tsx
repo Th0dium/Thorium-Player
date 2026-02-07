@@ -18,11 +18,10 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
 import TrackListItem from '@/components/TrackListItem';
 import EmptyState from '@/components/EmptyState';
-import { Track } from '@/types';
+import { Track, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 export type FilterType = 'all-songs' | 'favorites' | 'recently-added' | 'recently-played' | 'most-played' | 'not-played' | 'playlist' | 'album' | 'artist' | 'genre';
-type SortOption = 'title' | 'artist' | 'album' | 'dateAdded' | 'duration' | 'playCount';
 
 interface SongsListScreenProps {
     filter: FilterType;

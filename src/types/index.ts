@@ -137,6 +137,8 @@ export interface Queue {
     currentIndex: number;
     lastPlayed?: number;
     source: QueueSource;
+    sortBy?: SortOption;
+    sortAsc?: boolean;
 }
 
 export interface QueueSource {
@@ -216,6 +218,9 @@ export interface Settings {
 export type RepeatMode = 'off' | 'all' | 'one';
 
 export type ShuffleMode = 'off' | 'on';
+
+export type SortOption = 'title' | 'artist' | 'album' | 'dateAdded' | 'duration' | 'playCount';
+export type SortOrder = 'asc' | 'desc';
 
 export interface PlayerState {
     isPlaying: boolean;

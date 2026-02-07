@@ -19,10 +19,8 @@ import AlphabetScroller from '@/components/AlphabetScroller';
 import EmptyState from '@/components/EmptyState';
 import SkeletonList from '@/components/SkeletonLoader';
 import { useTheme } from '@/context/ThemeContext';
-import { Track } from '@/types';
+import { Track, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
-
-type SortOption = 'title' | 'artist' | 'album' | 'dateAdded' | 'duration';
 
 interface SongsScreenProps {
     searchQuery?: string;
