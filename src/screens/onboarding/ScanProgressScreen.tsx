@@ -6,9 +6,9 @@ import {
     StyleSheet,
     SafeAreaView,
     StatusBar,
-    ProgressBarAndroid,
     ActivityIndicator,
 } from 'react-native';
+import ProgressBarAndroid from '@react-native-community/progress-bar-android';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 import { ScanProgress, ScanResults } from '@/services/SongScannerService';

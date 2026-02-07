@@ -5,8 +5,8 @@ import {
     Text,
     StyleSheet,
     ActivityIndicator,
-    ProgressBarAndroid,
 } from 'react-native';
+import ProgressBarAndroid from '@react-native-community/progress-bar-android';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { colors, spacing, typography } from '@/constants/theme';
 import { ScanProgress } from '@/services/SongScannerService';
