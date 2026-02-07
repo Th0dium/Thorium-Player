@@ -56,7 +56,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MINI_PLAYER_HEIGHT = 64;
 const TAB_BAR_HEIGHT = 48;
 
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+type NavigationProp = NativeStackNavigationProp<any>;
+
 const MasterLayout: React.FC = () => {
+    const navigation = useNavigation<NavigationProp>();
     const insets = useSafeAreaInsets();
     const { colors } = useTheme();
     const { showToast } = useToast();
@@ -66,6 +72,7 @@ const MasterLayout: React.FC = () => {
     const librarySubScreen = useSettingsStore(state => state.librarySubScreen);
     const librarySubTitle = useSettingsStore(state => state.librarySubTitle);
     const setLibraryNavigation = useSettingsStore(state => state.setLibraryNavigation);
+    const reducedAnimations = useSettingsStore(state => state.reducedAnimations);
 
     // Initialize to nowPlaying if there's a current track, otherwise library
     const [activeTab, setActiveTab] = useState<TabId>(() => hasCurrentTrack ? 'nowPlaying' : 'library');
@@ -82,9 +89,9 @@ const MasterLayout: React.FC = () => {
     const handleTabPress = useCallback((tabId: TabId) => {
         const index = visibleTabs.findIndex(t => t.id === tabId);
         if (index !== -1 && scrollRef.current) {
-            scrollRef.current.scrollToIndex({ index, animated: true });
+            scrollRef.current.scrollToIndex({ index, animated: !reducedAnimations });
         }
-    }, [visibleTabs]);
+    }, [visibleTabs, reducedAnimations]);
 
     // Handle scroll end to sync tab state
     const handleMomentumScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -117,56 +124,60 @@ const MasterLayout: React.FC = () => {
 
     // Toggle search visibility with animation
     const handleSearchToggle = useCallback(() => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        if (!reducedAnimations) {
+            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
         setIsSearchVisible(prev => !prev);
         if (isSearchVisible) {
             setSearchQuery('');
         }
-    }, [isSearchVisible]);
+    }, [isSearchVisible, reducedAnimations]);
 
     // Handle hardware back button
-    useEffect(() => {
-        const onBackPress = () => {
-            // 1. Close Menu
-            if (isMenuVisible) {
-                setIsMenuVisible(false);
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                // 1. Close Menu
+                if (isMenuVisible) {
+                    setIsMenuVisible(false);
+                    return true;
+                }
+
+                // 2. Close Search
+                if (isSearchVisible) {
+                    handleSearchToggle();
+                    return true;
+                }
+
+                // 3. Library Sub-navigation
+                if (activeTab === 'library' && librarySubScreen) {
+                    handleLibraryBack();
+                    return true;
+                }
+
+                // 4. Tab Navigation (Back to Home/NowPlaying)
+                if (activeTab !== 'nowPlaying') {
+                    handleTabPress('nowPlaying');
+                    return true;
+                }
+
+                // 5. Double-press Exit logic (The "Popular Way")
+                const now = Date.now();
+                if (now - lastBackButtonPress.current < 2000) {
+                    BackHandler.exitApp();
+                    return true;
+                }
+
+                lastBackButtonPress.current = now;
+                showToast('Press back again to exit', 'info');
                 return true;
-            }
+            };
 
-            // 2. Close Search
-            if (isSearchVisible) {
-                handleSearchToggle();
-                return true;
-            }
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
 
-            // 3. Library Sub-navigation
-            if (activeTab === 'library' && librarySubScreen) {
-                handleLibraryBack();
-                return true;
-            }
-
-            // 4. Tab Navigation (Back to Home/NowPlaying)
-            if (activeTab !== 'nowPlaying') {
-                handleTabPress('nowPlaying');
-                return true;
-            }
-
-            // 5. Double-press Exit logic (The "Popular Way")
-            const now = Date.now();
-            if (now - lastBackButtonPress.current < 2000) {
-                BackHandler.exitApp();
-                return true;
-            }
-
-            lastBackButtonPress.current = now;
-            showToast('Press back again to exit', 'info');
-            return true;
-        };
-
-        const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
-
-        return () => subscription.remove();
-    }, [isMenuVisible, isSearchVisible, activeTab, librarySubScreen, handleTabPress, handleLibraryBack, handleSearchToggle, showToast]);
+            return () => subscription.remove();
+        }, [isMenuVisible, isSearchVisible, activeTab, librarySubScreen, handleTabPress, handleLibraryBack, handleSearchToggle, showToast])
+    );
 
     // Initial scroll to the default tab
     useEffect(() => {
@@ -365,6 +376,9 @@ const MasterLayout: React.FC = () => {
                 onClose={() => setIsMenuVisible(false)}
                 onScan={() => {
                     useLibraryStore.getState().scanForMusic();
+                }}
+                onSettings={() => {
+                    navigation.navigate('Settings');
                 }}
             />
         </View>

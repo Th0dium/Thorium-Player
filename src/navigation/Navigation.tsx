@@ -16,11 +16,26 @@ import NowPlayingScreen from '@/screens/NowPlayingScreen';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTheme } from '@/context/ThemeContext';
 
+// Settings screens
+import { SettingsScreen } from '@/screens/settings/SettingsScreen';
+import { AppearanceSettingsScreen } from '@/screens/settings/AppearanceSettingsScreen';
+import { PlaybackSettingsScreen } from '@/screens/settings/PlaybackSettingsScreen';
+import { LibrarySettingsScreen } from '@/screens/settings/LibrarySettingsScreen';
+import { DataBackupSettingsScreen } from '@/screens/settings/DataBackupSettingsScreen';
+import { AdvancedSettingsScreen } from '@/screens/settings/AdvancedSettingsScreen';
+import { UnsortedSettingsScreen } from '@/screens/settings/UnsortedSettingsScreen';
+
 // Type definitions for navigation
 export type RootStackParamList = {
     Main: undefined;
     NowPlaying: undefined;
     Settings: undefined;
+    AppearanceSettings: undefined;
+    PlaybackSettings: undefined;
+    LibrarySettings: undefined;
+    DataBackupSettings: undefined;
+    AdvancedSettings: undefined;
+    UnsortedSettings: undefined;
     AlbumDetail: { albumId: string };
     ArtistDetail: { artistId: string };
     PlaylistDetail: { playlistId: string };
@@ -33,6 +48,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const Navigation: React.FC = () => {
     const loadSettings = useSettingsStore(state => state.loadSettings);
     const isLoaded = useSettingsStore(state => state.isLoaded);
+    const reducedAnimations = useSettingsStore(state => state.reducedAnimations);
     const { colors, isDark } = useTheme();
 
     useEffect(() => {
@@ -64,11 +80,59 @@ const Navigation: React.FC = () => {
             >
                 <Stack.Navigator
                     screenOptions={{
-                        headerShown: false,
-                        animation: 'fade',
+                        headerShown: true,
+                        animation: reducedAnimations ? 'none' : 'simple_push',
+                        headerStyle: {
+                            backgroundColor: colors.surface,
+                        },
+                        headerTintColor: colors.text,
+                        headerTitleStyle: {
+                            fontWeight: '600',
+                        },
                     }}
                 >
-                    <Stack.Screen name="Main" component={MasterLayout} />
+                    <Stack.Screen
+                        name="Main"
+                        component={MasterLayout}
+                        options={{ headerShown: false }}
+                    />
+
+                    {/* Settings Screens */}
+                    <Stack.Screen
+                        name="Settings"
+                        component={SettingsScreen}
+                        options={{ title: 'Settings' }}
+                    />
+                    <Stack.Screen
+                        name="AppearanceSettings"
+                        component={AppearanceSettingsScreen}
+                        options={{ title: 'Appearance' }}
+                    />
+                    <Stack.Screen
+                        name="PlaybackSettings"
+                        component={PlaybackSettingsScreen}
+                        options={{ title: 'Playback' }}
+                    />
+                    <Stack.Screen
+                        name="LibrarySettings"
+                        component={LibrarySettingsScreen}
+                        options={{ title: 'Library' }}
+                    />
+                    <Stack.Screen
+                        name="DataBackupSettings"
+                        component={DataBackupSettingsScreen}
+                        options={{ title: 'Data & Backup' }}
+                    />
+                    <Stack.Screen
+                        name="AdvancedSettings"
+                        component={AdvancedSettingsScreen}
+                        options={{ title: 'Advanced' }}
+                    />
+                    <Stack.Screen
+                        name="UnsortedSettings"
+                        component={UnsortedSettingsScreen}
+                        options={{ title: 'Miscellaneous' }}
+                    />
                 </Stack.Navigator>
             </NavigationContainer>
         </SafeAreaProvider>

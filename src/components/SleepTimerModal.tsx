@@ -13,6 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
 import { useSleepTimerStore } from '@/services/SleepTimerService';
+import { useSettingsStore } from '@/store/settingsStore';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 interface SleepTimerModalProps {
@@ -33,6 +34,7 @@ const TRACK_PRESETS = [1, 2, 3, 5, 10];
 
 const SleepTimerModal: React.FC<SleepTimerModalProps> = ({ visible, onClose }) => {
     const { colors } = useTheme();
+    const reducedAnimations = useSettingsStore(s => s.reducedAnimations);
     const isActive = useSleepTimerStore(s => s.isActive);
     const displayTime = useSleepTimerStore(s => s.displayTime);
     const mode = useSleepTimerStore(s => s.mode);
@@ -76,7 +78,7 @@ const SleepTimerModal: React.FC<SleepTimerModalProps> = ({ visible, onClose }) =
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
+            animationType={reducedAnimations ? 'fade' : 'slide'}
             onRequestClose={onClose}
         >
             <View style={styles.overlay}>
