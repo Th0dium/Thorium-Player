@@ -24,6 +24,8 @@ import { LibrarySettingsScreen } from '@/screens/settings/LibrarySettingsScreen'
 import { DataBackupSettingsScreen } from '@/screens/settings/DataBackupSettingsScreen';
 import { AdvancedSettingsScreen } from '@/screens/settings/AdvancedSettingsScreen';
 import { UnsortedSettingsScreen } from '@/screens/settings/UnsortedSettingsScreen';
+import { ThemePickerScreen } from '@/screens/settings/ThemePickerScreen';
+import { AccentColorPickerScreen } from '@/screens/settings/AccentColorPickerScreen';
 
 // Type definitions for navigation
 export type RootStackParamList = {
@@ -36,6 +38,8 @@ export type RootStackParamList = {
     DataBackupSettings: undefined;
     AdvancedSettings: undefined;
     UnsortedSettings: undefined;
+    ThemePickerScreen: undefined;
+    AccentColorPickerScreen: undefined;
     AlbumDetail: { albumId: string };
     ArtistDetail: { artistId: string };
     PlaylistDetail: { playlistId: string };
@@ -132,6 +136,16 @@ const Navigation: React.FC = () => {
                         name="UnsortedSettings"
                         component={UnsortedSettingsScreen}
                         options={{ title: 'Miscellaneous' }}
+                    />
+                    <Stack.Screen
+                        name="ThemePickerScreen"
+                        component={ThemePickerScreen}
+                        options={{ title: 'Select Theme' }}
+                    />
+                    <Stack.Screen
+                        name="AccentColorPickerScreen"
+                        component={AccentColorPickerScreen}
+                        options={{ title: 'Select Accent Color' }}
                     />
                 </Stack.Navigator>
             </NavigationContainer>

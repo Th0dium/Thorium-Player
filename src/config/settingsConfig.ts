@@ -20,6 +20,7 @@ export interface SettingItem {
     id: string;
     type: SettingType;
     label: string;
+    description?: string; // Helpful text explaining what the setting does
     icon?: string;
     subtitle?: string;
     implemented: boolean;
@@ -40,7 +41,7 @@ export interface SettingItem {
     unit?: string;
 
     // For navigation type
-    screen?: string;
+    navigationTarget?: string;
     badge?: string | (() => string);
 
     // For link type
@@ -64,7 +65,6 @@ export const getSettingsFolders = (): SettingsFolder[] => [
         id: 'appearance',
         title: 'Appearance',
         icon: '🎨',
-        description: 'Customize how Thorium looks',
         sections: [
             {
                 items: [
@@ -78,7 +78,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                             const theme = useSettingsStore.getState().theme;
                             return theme.charAt(0).toUpperCase() + theme.slice(1);
                         },
-                        screen: 'ThemePicker',
+                        navigationTarget: 'ThemePickerScreen',
                     },
                     {
                         id: 'accent_color',
@@ -90,7 +90,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                             const color = useSettingsStore.getState().accentColor;
                             return color ? 'Custom' : 'Default';
                         },
-                        screen: 'AccentColorPicker',
+                        navigationTarget: 'AccentColorPickerScreen',
                     },
                     {
                         id: 'font_size',
@@ -191,6 +191,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'close_on_queue_end',
                         type: 'toggle',
                         label: 'Close on Queue End',
+                        description: 'Automatically exit the app when the queue finishes playing',
                         icon: 'exit-outline',
                         implemented: true,
                         getValue: () => useSettingsStore.getState().closeOnQueueEnd,
@@ -200,6 +201,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'gapless_playback',
                         type: 'toggle',
                         label: 'Gapless Playback',
+                        description: 'Play tracks without silence between them for seamless listening',
                         icon: 'swap-horizontal-outline',
                         implemented: true,
                         getValue: () => useSettingsStore.getState().gaplessPlayback,
@@ -209,6 +211,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'crossfade',
                         type: 'slider',
                         label: 'Crossfade Duration',
+                        description: 'Blend volume between tracks for smooth transitions',
                         icon: 'git-merge-outline',
                         implemented: false,
                         min: 0,
@@ -220,6 +223,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'resume_position',
                         type: 'toggle',
                         label: 'Resume from Last Position',
+                        description: 'Continue playing from where you left off when you restart',
                         icon: 'play-circle-outline',
                         implemented: false,
                     },
@@ -232,15 +236,17 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'equalizer',
                         type: 'navigation',
                         label: 'Equalizer',
+                        description: 'Adjust audio frequencies to customize your sound',
                         icon: 'stats-chart-outline',
                         implemented: false,
                         subtitle: 'Flat',
-                        screen: 'Equalizer',
+                        navigationTarget: 'Equalizer',
                     },
                     {
                         id: 'bass_boost',
                         type: 'toggle',
                         label: 'Bass Boost',
+                        description: 'Enhance low frequencies for deeper bass',
                         icon: 'pulse-outline',
                         implemented: false,
                     },
@@ -272,12 +278,13 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         icon: 'folder-open-outline',
                         implemented: false,
                         badge: '4 folders',
-                        screen: 'FolderSelection',
+                        navigationTarget: 'FolderSelection',
                     },
                     {
                         id: 'auto_scan_startup',
                         type: 'toggle',
                         label: 'Auto-scan on Startup',
+                        description: 'Automatically scan for new music files when the app starts',
                         icon: 'refresh-outline',
                         implemented: true,
                         getValue: () => useSettingsStore.getState().autoScanOnStartup,
@@ -287,6 +294,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'rescan_library',
                         type: 'action',
                         label: 'Rescan Library',
+                        description: 'Search for new or updated music files in your library folders',
                         icon: 'sync-outline',
                         implemented: true,
                         onPress: () => useLibraryStore.getState().scanForMusic(),
@@ -295,6 +303,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'last_scan',
                         type: 'info',
                         label: 'Last Scan',
+                        description: 'Total number of music tracks in your library',
                         icon: 'time-outline',
                         implemented: true,
                         getValue: () => {
@@ -314,7 +323,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         icon: 'musical-note-outline',
                         implemented: false,
                         subtitle: 'mp3, m4a, flac, wav',
-                        screen: 'FileFormats',
+                        navigationTarget: 'FileFormats',
                     },
                     {
                         id: 'auto_tag_ai',
@@ -355,6 +364,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'backup_library',
                         type: 'action',
                         label: 'Backup Library',
+                        description: 'Create a backup of your library, playlists, and settings',
                         icon: 'cloud-upload-outline',
                         implemented: true,
                         subtitle: 'Last: Jan 5, 2026',
@@ -363,6 +373,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'restore_backup',
                         type: 'action',
                         label: 'Restore from Backup',
+                        description: 'Restore your library and settings from a previous backup',
                         icon: 'cloud-download-outline',
                         implemented: true,
                     },
@@ -458,7 +469,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         icon: 'headset-outline',
                         implemented: false,
                         subtitle: 'Remap multi-click',
-                        screen: 'HeadphoneControls',
+                        navigationTarget: 'HeadphoneControls',
                     },
                 ],
             },
@@ -507,6 +518,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'sleep_timer_default',
                         type: 'value',
                         label: 'Default Duration',
+                        description: 'Default time before music stops automatically',
                         icon: 'moon-outline',
                         implemented: false,
                         subtitle: '30 min',
@@ -521,6 +533,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'sleep_timer_fadeout',
                         type: 'toggle',
                         label: 'Fade-out Enabled',
+                        description: 'Gradually reduce volume before stopping instead of stopping abruptly',
                         icon: 'volume-low-outline',
                         implemented: false,
                     },
@@ -533,6 +546,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'lyrics_auto_fetch',
                         type: 'toggle',
                         label: 'Auto-fetch Online',
+                        description: 'Automatically search and download lyrics from the internet',
                         icon: 'cloud-outline',
                         implemented: false,
                     },
@@ -596,6 +610,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'version',
                         type: 'info',
                         label: 'Version',
+                        description: 'Current app version and build number',
                         icon: 'information-circle-outline',
                         implemented: true,
                         subtitle: '1.0.0 (Build 42)',
@@ -604,6 +619,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         id: 'github',
                         type: 'link',
                         label: 'GitHub Repository',
+                        description: 'Visit the open source code repository on GitHub',
                         icon: 'logo-github',
                         implemented: true,
                         url: 'https://github.com/yourusername/thorium-player',
@@ -614,7 +630,7 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         label: 'Open Source Licenses',
                         icon: 'book-outline',
                         implemented: false,
-                        screen: 'Licenses',
+                        navigationTarget: 'Licenses',
                     },
                 ],
             },
