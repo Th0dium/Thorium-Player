@@ -50,63 +50,68 @@ interface UISettings {
     queueBehavior: QueueBehavior;
     pauseOnUnplug: boolean;
     resumeOnBluetooth: boolean;
-        autoScanOnStartup: boolean;
-        showTrackNotification: boolean;
-        gaplessPlayback: boolean;
-        closeOnQueueEnd: boolean;
-        reducedAnimations: boolean;
-    
-        // Navigation state persistence
-        librarySubScreen: string | null;
-        librarySubTitle: string;
-    }
-    
-    interface SettingsStore extends UISettings {
-        isLoaded: boolean;
-    
-        // Actions
-        loadSettings: () => Promise<void>;
-        saveSettings: () => Promise<void>;
-    
-        // Setters
-        setSelectedTabs: (tabs: TabId[]) => void;
-        setTheme: (theme: ThemeOption) => void;
-        setAccentColor: (color: string | null) => void;
-        setFolderView: (view: FolderViewOption) => void;
-        setQueueBehavior: (behavior: QueueBehavior) => void;
-        setPauseOnUnplug: (value: boolean) => void;
-        setResumeOnBluetooth: (value: boolean) => void;
-        setAutoScanOnStartup: (value: boolean) => void;
-        setShowTrackNotification: (value: boolean) => void;
-        setGaplessPlayback: (value: boolean) => void;
-        setCloseOnQueueEnd: (value: boolean) => void;
-        setReducedAnimations: (value: boolean) => void;
-        setLibraryNavigation: (screen: string | null, title?: string) => void;
-    
-        // Bulk update
-        updateSettings: (settings: Partial<UISettings>) => void;
-    
-        // Helpers
-        getTabConfig: () => TabConfig[];
-    }
-    
-    const DEFAULT_SETTINGS: UISettings = {
-        selectedTabs: ['queue', 'nowPlaying', 'library'],
-        theme: 'dark',
-        accentColor: null,
-        folderView: 'hierarchical',
-        queueBehavior: 'clearAndPlay',
-        pauseOnUnplug: true,
-        resumeOnBluetooth: false,
-        autoScanOnStartup: false,
-        showTrackNotification: true,
-        gaplessPlayback: true,
-        closeOnQueueEnd: false,
-        reducedAnimations: false,
-        librarySubScreen: null,
-        librarySubTitle: '',
-    };
-    
+    autoScanOnStartup: boolean;
+    showTrackNotification: boolean;
+    gaplessPlayback: boolean;
+    closeOnQueueEnd: boolean;
+    reducedAnimations: boolean;
+
+    // Library scanning
+    scanFolders: string[]; // Paths to scan for music files
+
+    // Navigation state persistence
+    librarySubScreen: string | null;
+    librarySubTitle: string;
+}
+
+interface SettingsStore extends UISettings {
+    isLoaded: boolean;
+
+    // Actions
+    loadSettings: () => Promise<void>;
+    saveSettings: () => Promise<void>;
+
+    // Setters
+    setSelectedTabs: (tabs: TabId[]) => void;
+    setTheme: (theme: ThemeOption) => void;
+    setAccentColor: (color: string | null) => void;
+    setFolderView: (view: FolderViewOption) => void;
+    setQueueBehavior: (behavior: QueueBehavior) => void;
+    setPauseOnUnplug: (value: boolean) => void;
+    setResumeOnBluetooth: (value: boolean) => void;
+    setAutoScanOnStartup: (value: boolean) => void;
+    setShowTrackNotification: (value: boolean) => void;
+    setGaplessPlayback: (value: boolean) => void;
+    setCloseOnQueueEnd: (value: boolean) => void;
+    setReducedAnimations: (value: boolean) => void;
+    setScanFolders: (folders: string[]) => void;
+    setLibraryNavigation: (screen: string | null, title?: string) => void;
+
+    // Bulk update
+    updateSettings: (settings: Partial<UISettings>) => void;
+
+    // Helpers
+    getTabConfig: () => TabConfig[];
+}
+
+const DEFAULT_SETTINGS: UISettings = {
+    selectedTabs: ['queue', 'nowPlaying', 'library'],
+    theme: 'dark',
+    accentColor: null,
+    folderView: 'hierarchical',
+    queueBehavior: 'clearAndPlay',
+    pauseOnUnplug: true,
+    resumeOnBluetooth: false,
+    autoScanOnStartup: false,
+    showTrackNotification: true,
+    gaplessPlayback: true,
+    closeOnQueueEnd: false,
+    reducedAnimations: false,
+    scanFolders: [],
+    librarySubScreen: null,
+    librarySubTitle: '',
+};
+
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
     // Initial state
@@ -151,6 +156,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                     gaplessPlayback: state.gaplessPlayback,
                     closeOnQueueEnd: state.closeOnQueueEnd,
                     reducedAnimations: state.reducedAnimations,
+                    scanFolders: state.scanFolders,
                     librarySubScreen: state.librarySubScreen,
                     librarySubTitle: state.librarySubTitle,
                 };
@@ -219,6 +225,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
     setReducedAnimations: (value) => {
         set({ reducedAnimations: value });
+        get().saveSettings();
+    },
+
+    setScanFolders: (folders) => {
+        set({ scanFolders: folders });
         get().saveSettings();
     },
 

@@ -276,8 +276,11 @@ export const getSettingsFolders = (): SettingsFolder[] => [
                         type: 'navigation',
                         label: 'Folders to Scan',
                         icon: 'folder-open-outline',
-                        implemented: false,
-                        badge: '4 folders',
+                        implemented: true,
+                        getValue: () => {
+                            const folders = useSettingsStore.getState().scanFolders;
+                            return folders.length > 0 ? `${folders.length} folder${folders.length === 1 ? '' : 's'}` : 'Not configured';
+                        },
                         navigationTarget: 'FolderSelection',
                     },
                     {

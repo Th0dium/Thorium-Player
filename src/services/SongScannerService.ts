@@ -1,5 +1,13 @@
 // Song Scanner Service - Scans device for audio files and profiles them with metadata
 // Generates fingerprints, reads metadata, and stores extended song information
+// 
+// ℹ️ NOTE: This service is currently only used in the onboarding flow:
+// - OnboardingNavigator.tsx uses scanAndProfile()
+// - ScanProgressScreen displays progress from this service
+// - Main app uses libraryStore.scanForMusic() which has been unified and improved
+// - This service duplicates scanning logic but provides additional features like cancellation
+// - Consider migrating onboarding to use libraryStore in future cleanup
+//
 import RNFS from 'react-native-fs';
 import TrackPlayer, { Track } from 'react-native-track-player';
 import { Track as AppTrack, SongMetadata } from '@/types';

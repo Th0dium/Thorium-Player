@@ -1,4 +1,10 @@
 // Metadata Extractor - Reads ID3 tags and metadata from audio files
+// 
+// ⚠️ DEPRECATED: This service is no longer used.
+// - MetadataExtractorService has replaced this with better caching
+// - LibraryProfilingService uses native MediaMetadata module directly
+// - This file can be deleted in a future cleanup
+//
 import { Track } from '@/types';
 import { Platform } from 'react-native';
 

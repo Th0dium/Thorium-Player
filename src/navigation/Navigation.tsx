@@ -26,6 +26,7 @@ import { AdvancedSettingsScreen } from '@/screens/settings/AdvancedSettingsScree
 import { UnsortedSettingsScreen } from '@/screens/settings/UnsortedSettingsScreen';
 import { ThemePickerScreen } from '@/screens/settings/ThemePickerScreen';
 import { AccentColorPickerScreen } from '@/screens/settings/AccentColorPickerScreen';
+import { FolderSelectionScreen } from '@/screens/settings/FolderSelectionScreen';
 
 // Type definitions for navigation
 export type RootStackParamList = {
@@ -40,6 +41,7 @@ export type RootStackParamList = {
     UnsortedSettings: undefined;
     ThemePickerScreen: undefined;
     AccentColorPickerScreen: undefined;
+    FolderSelection: undefined;
     AlbumDetail: { albumId: string };
     ArtistDetail: { artistId: string };
     PlaylistDetail: { playlistId: string };
@@ -146,6 +148,11 @@ const Navigation: React.FC = () => {
                         name="AccentColorPickerScreen"
                         component={AccentColorPickerScreen}
                         options={{ title: 'Select Accent Color' }}
+                    />
+                    <Stack.Screen
+                        name="FolderSelection"
+                        component={FolderSelectionScreen}
+                        options={{ title: 'Select Folders to Scan' }}
                     />
                 </Stack.Navigator>
             </NavigationContainer>

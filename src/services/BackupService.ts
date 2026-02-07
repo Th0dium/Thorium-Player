@@ -15,6 +15,7 @@ import {
     Settings,
 } from '@/types';
 import { databaseService } from './DatabaseService';
+import { fileSystemService } from './FileSystemService';
 import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
 
@@ -353,9 +354,9 @@ class BackupService {
     ): Promise<Map<string, string>> {
         const pathMap = new Map<string, string>();
 
-        // Scan the new root for all audio files
-        const audioExtensions = ['.mp3', '.m4a', '.flac', '.wav', '.ogg', '.aac', '.wma'];
-        const foundFiles = await this.scanDirectoryRecursive(newRoot, audioExtensions);
+        // Scan the new root for all audio files using FileSystemService
+        const { tracks: foundTracks } = await fileSystemService.scanDirectory(newRoot, true, []);
+        const foundFiles = foundTracks.map(t => t.path!);
 
         // Build a map from filename to full path for quick lookup
         const filenameMap = new Map<string, string[]>();
@@ -500,27 +501,6 @@ class BackupService {
 
     private fromRelativePath(relativePath: string, newRoot: string): string {
         return relativePath.replace(ROOT_PLACEHOLDER, newRoot);
-    }
-
-    private async scanDirectoryRecursive(dir: string, extensions: string[]): Promise<string[]> {
-        const results: string[] = [];
-
-        try {
-            const items = await RNFS.readDir(dir);
-
-            for (const item of items) {
-                if (item.isDirectory()) {
-                    const subResults = await this.scanDirectoryRecursive(item.path, extensions);
-                    results.push(...subResults);
-                } else if (extensions.some(ext => item.name.toLowerCase().endsWith(ext))) {
-                    results.push(item.path);
-                }
-            }
-        } catch (error) {
-            // Ignore permission errors
-        }
-
-        return results;
     }
 
     private calculateChecksum(data: string): string {

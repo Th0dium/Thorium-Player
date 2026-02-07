@@ -1,5 +1,11 @@
 // Metadata Extractor Service - Extracts complete audio metadata (duration, artwork, etc)
 // Uses react-native-get-music-files for reliable metadata extraction
+// 
+// ⚠️ NOTE: This service is only used for type exports (AudioMetadata)
+// - LibraryProfilingService uses native MediaMetadata module directly, not this service
+// - The extractFromFile() method has a critical bug (calls MusicFiles.getAll() per file - O(N×M))
+// - Consider removing extractMetadata/extractFromFile methods in future cleanup
+//
 import RNFS from 'react-native-fs';
 import { Track } from '@/types';
 

@@ -11,6 +11,7 @@ import {
     ScanProgressScreen,
 } from '@/screens/onboarding';
 import { colors } from '@/constants/theme';
+import { useSettingsStore } from '@/store/settingsStore';
 import songScannerService, { ScanProgress, ScanResults } from '@/services/SongScannerService';
 
 type OnboardingStep = 'welcome' | 'permission' | 'scanner' | 'ui' | 'config' | 'scanProgress';
@@ -58,6 +59,10 @@ const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({ onComplete })
     const backgroundScanRef = useRef<Promise<ScanResults> | null>(null);
 
     const handleComplete = async () => {
+        // Save the selected scan folders to settings for future use
+        if (scannerSettings?.folderPaths) {
+            useSettingsStore.getState().setScanFolders(scannerSettings.folderPaths);
+        }
         await setOnboardingComplete();
         onComplete();
     };
