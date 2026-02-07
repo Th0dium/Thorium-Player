@@ -64,6 +64,7 @@ export const useFolderDetection = (initialSelected: string[] = []) => {
                 }
             }
 
+            console.log('useFolderDetection - detected folders:', folders);
             setDetectedFolders(folders);
         } catch (error) {
             console.error('Error detecting folders:', error);

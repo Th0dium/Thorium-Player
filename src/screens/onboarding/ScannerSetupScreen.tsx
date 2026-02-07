@@ -39,10 +39,6 @@ const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack 
         detectMusicFolders,
     } = useFolderDetection();
 
-    // Detect folders on mount
-    useEffect(() => {
-        detectMusicFolders();
-    }, []);
     const handleManualFolderSelect = (path: string) => {
         addFolder(path);
         setShowFolderBrowser(false);
@@ -50,14 +46,17 @@ const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack 
 
     const handleContinue = () => {
         // Save settings to store/database
+        const folderPaths = detectedFolders.map(f => f.path);
+        console.log('ScannerSetupScreen - detected folders:', detectedFolders);
+        console.log('ScannerSetupScreen - folder paths to send:', folderPaths);
         const settings = {
-            folderPaths: detectedFolders.map(f => f.path),
+            folderPaths,
             excludeRingtones,
             excludeNotifications,
             excludeShortFiles,
             minDuration,
         };
-        console.log('Scanner settings:', settings);
+        console.log('ScannerSetupScreen - sending settings:', settings);
         onNext(settings);
     };
 
