@@ -15,6 +15,7 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import TrackListItem from '@/components/TrackListItem';
+import { TrackActionsModal } from '@/components/TrackActionsModal';
 import AlphabetScroller from '@/components/AlphabetScroller';
 import EmptyState from '@/components/EmptyState';
 import SkeletonList from '@/components/SkeletonLoader';
@@ -36,6 +37,8 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [showTrackActions, setShowTrackActions] = useState(false);
+    const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     // Use individual selectors to prevent re-renders when unrelated state changes
     const tracks = useLibraryStore(state => state.tracks);
@@ -150,6 +153,11 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
         exitSelectionMode();
     }, [filteredAndSortedTracks, selectedTracks, addToQueue, exitSelectionMode]);
 
+    const handleMorePress = useCallback((track: Track) => {
+        setSelectedTrack(track);
+        setShowTrackActions(true);
+    }, []);
+
     const renderItem = useCallback(({ item, index }: { item: Track; index: number }) => (
         <TrackListItem
             track={item}
@@ -159,8 +167,9 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             showSelection={isSelectionMode}
             onPress={() => handleTrackPress(item, index)}
             onLongPress={() => handleTrackLongPress(item)}
+            onMorePress={handleMorePress}
         />
-    ), [currentTrackId, isPlaying, selectedTracks, isSelectionMode, handleTrackPress, handleTrackLongPress]);
+    ), [currentTrackId, isPlaying, selectedTracks, isSelectionMode, handleTrackPress, handleTrackLongPress, handleMorePress]);
 
     const keyExtractor = useCallback((item: Track) => item.id, []);
 
@@ -265,6 +274,14 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
                 sortBy={sortBy}
                 sortAsc={sortAsc}
                 onSortChange={handleSortChange}
+            />
+
+            {/* Track Actions Modal */}
+            <TrackActionsModal
+                visible={showTrackActions}
+                track={selectedTrack}
+                onClose={() => setShowTrackActions(false)}
+                onAddToQueue={(track) => addToQueue([track])}
             />
         </View>
     );

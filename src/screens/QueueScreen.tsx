@@ -23,6 +23,7 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
 import TrackListItem from '@/components/TrackListItem';
+import { TrackActionsModal } from '@/components/TrackActionsModal';
 import SortMenu from '@/components/SortMenu';
 import { Track, Queue, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
@@ -60,6 +61,8 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [sortBy, setSortBy] = useState<SortOption>(currentQueue?.sortBy || 'title');
     const [sortAsc, setSortAsc] = useState(currentQueue?.sortAsc ?? true);
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [showTrackActions, setShowTrackActions] = useState(false);
+    const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     // Sync sorting state when queue changes
     useEffect(() => {
@@ -172,7 +175,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
             setSortAsc(newSortAsc);
         }
         setShowSortMenu(false);
-        
+
         // Apply sorting to queue store
         await sortQueue(option, newSortAsc);
     }, [sortBy, sortAsc, sortQueue]);
@@ -297,6 +300,11 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         await usePlayerStore.getState().play();
     }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks]);
 
+    const handleMorePress = useCallback((track: Track) => {
+        setSelectedTrack(track);
+        setShowTrackActions(true);
+    }, []);
+
     const renderQueueItem = useCallback(({ item, drag, getIndex, isActive: isDragging }: RenderItemParams<Track>) => {
         const filteredIndex = getIndex();
         if (filteredIndex === undefined) return null;
@@ -313,7 +321,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         const isSearching = isSearchActive && !!searchQuery;
 
         return (
-            <View 
+            <View
                 style={isDragging ? {
                     elevation: 8,
                     shadowColor: '#000',
@@ -340,10 +348,9 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     isPast={isPast}
                     showArtwork={true}
                     showDragHandle={!isSearching}
-                    showRemoveButton={true}
                     drag={isSearching ? undefined : drag}
                     onPress={() => handleTrackPress(filteredIndex)}
-                    onRemove={() => removeFromQueue(realIndex)}
+                    onMorePress={handleMorePress}
                 />
             </View>
         );
@@ -460,10 +467,10 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                         onPress={() => setShowSortMenu(true)}
                     >
                         <Icon name="sort" size={20} color={colors.textSecondary} />
-                        <Icon 
-                            name={sortAsc ? 'arrow-up' : 'arrow-down'} 
-                            size={14} 
-                            color={colors.primary} 
+                        <Icon
+                            name={sortAsc ? 'arrow-up' : 'arrow-down'}
+                            size={14}
+                            color={colors.primary}
                             style={styles.sortArrow}
                         />
                     </TouchableOpacity>
@@ -615,6 +622,18 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 sortAsc={sortAsc}
                 onSortChange={handleSortOptionPress}
                 title="Sort Queue by"
+            />
+
+            {/* Track Actions Modal */}
+            <TrackActionsModal
+                visible={showTrackActions}
+                track={selectedTrack}
+                onClose={() => setShowTrackActions(false)}
+                onRemove={(track) => {
+                    const index = queueTracks.findIndex(t => t.id === track.id);
+                    if (index >= 0) removeFromQueue(index);
+                }}
+                showRemove={true}
             />
         </GestureHandlerRootView>
     );

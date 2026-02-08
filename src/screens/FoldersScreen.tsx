@@ -18,6 +18,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { Folder, Track } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import TrackListItem from '@/components/TrackListItem';
+import { TrackActionsModal } from '@/components/TrackActionsModal';
 
 interface FoldersScreenProps {
     searchQuery?: string;
@@ -32,6 +33,8 @@ interface FolderItem {
 const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay }) => {
     const { colors } = useTheme();
     const [currentPath, setCurrentPath] = useState<string[]>([]);
+    const [showTrackActions, setShowTrackActions] = useState(false);
+    const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     const folders = useLibraryStore(state => state.folders);
     const tracks = useLibraryStore(state => state.tracks);
@@ -122,6 +125,11 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
         onPlay?.();
     }, [tracksInCurrentFolder, currentPath, createQueue, onPlay]);
 
+    const handleMorePress = useCallback((track: Track) => {
+        setSelectedTrack(track);
+        setShowTrackActions(true);
+    }, []);
+
     const handleBackPress = useCallback(() => {
         setCurrentPath(prev => prev.slice(0, -1));
     }, []);
@@ -181,7 +189,7 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                     track={track}
                     isPlaying={currentTrack?.id === track.id && isPlaying}
                     onPress={() => handleTrackPress(track, index)}
-                    onMenuPress={() => { }}
+                    onMorePress={handleMorePress}
                 />
             );
         }
@@ -270,6 +278,14 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                         subtitle={!searchQuery && currentPath.length === 0 ? 'Scan your device to find music folders' : undefined}
                     />
                 }
+            />
+
+            {/* Track Actions Modal */}
+            <TrackActionsModal
+                visible={showTrackActions}
+                track={selectedTrack}
+                onClose={() => setShowTrackActions(false)}
+                onAddToQueue={(track) => addToQueue([track])}
             />
         </View>
     );

@@ -17,6 +17,7 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
 import TrackListItem from '@/components/TrackListItem';
+import { TrackActionsModal } from '@/components/TrackActionsModal';
 import EmptyState from '@/components/EmptyState';
 import SortMenu from '@/components/SortMenu';
 import { useSort } from '@/hooks/useSort';
@@ -66,6 +67,8 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         `list-${filter}-${playlistId || albumId || artistId || genreId || 'default'}`
     );
     const [showSortMenu, setShowSortMenu] = useState(false);
+    const [showTrackActions, setShowTrackActions] = useState(false);
+    const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     // Filter and sort tracks
     const filteredTracks = useMemo(() => {
@@ -175,14 +178,20 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         onPlay?.();
     }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay, sortBy, sortAsc]);
 
+    const handleMorePress = useCallback((track: Track) => {
+        setSelectedTrack(track);
+        setShowTrackActions(true);
+    }, []);
+
     const renderItem = useCallback(({ item, index }: { item: Track; index: number }) => (
         <TrackListItem
             track={item}
             isPlaying={currentTrackId === item.id}
             onPress={() => handleTrackPress(item, index)}
+            onMorePress={handleMorePress}
             rightElement={filter === 'most-played' || sortBy === 'playCount' ? (
-                <Text style={{ 
-                    color: colors.textTertiary, 
+                <Text style={{
+                    color: colors.textTertiary,
                     fontSize: typography.sizes.sm,
                     fontWeight: 'bold',
                     opacity: 0.8
@@ -191,7 +200,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                 </Text>
             ) : undefined}
         />
-    ), [currentTrackId, handleTrackPress, filter, sortBy, colors, typography]);
+    ), [currentTrackId, handleTrackPress, filter, sortBy, colors, typography, handleMorePress]);
 
     const keyExtractor = useCallback((item: Track) => item.id, []);
 
@@ -233,17 +242,17 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                             {filteredTracks.length} songs
                         </Text>
                         <View style={[styles.dot, { backgroundColor: colors.textTertiary }]} />
-                        <TouchableOpacity 
-                            style={styles.sortToggleButton} 
+                        <TouchableOpacity
+                            style={styles.sortToggleButton}
                             onPress={() => setShowSortMenu(true)}
                         >
                             <Text style={[styles.sortText, { color: colors.primary }]}>
                                 {getSortLabel(sortBy)}
                             </Text>
-                            <Icon 
-                                name={sortAsc ? 'arrow-up' : 'arrow-down'} 
-                                size={14} 
-                                color={colors.primary} 
+                            <Icon
+                                name={sortAsc ? 'arrow-up' : 'arrow-down'}
+                                size={14}
+                                color={colors.primary}
                                 style={{ marginLeft: 2 }}
                             />
                         </TouchableOpacity>
@@ -279,6 +288,14 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                 sortBy={sortBy}
                 sortAsc={sortAsc}
                 onSortChange={handleSortChange}
+            />
+
+            {/* Track Actions Modal */}
+            <TrackActionsModal
+                visible={showTrackActions}
+                track={selectedTrack}
+                onClose={() => setShowTrackActions(false)}
+                onAddToQueue={(track) => addToQueue([track])}
             />
         </View>
     );
