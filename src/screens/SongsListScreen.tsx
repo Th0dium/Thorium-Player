@@ -16,7 +16,9 @@ import { useTheme } from '@/context/ThemeContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
+import { useTrackSelection } from '@/hooks/useTrackSelection';
 import TrackListItem from '@/components/TrackListItem';
+import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
 import EmptyState from '@/components/EmptyState';
 import SortMenu from '@/components/SortMenu';
@@ -60,7 +62,6 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     const currentTrackId = usePlayerStore(state => state.currentTrack?.id);
     const createQueue = useQueueStore(state => state.createQueue);
 
-    // Sorting state
     const { sortBy, sortAsc, handleSortChange, sortTracks } = useSort(
         filter === 'most-played' ? 'playCount' : (filter === 'recently-added' || filter === 'recently-played' ? 'dateAdded' : 'title'),
         filter !== 'most-played' && filter !== 'recently-added' && filter !== 'recently-played',
@@ -69,6 +70,9 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [showTrackActions, setShowTrackActions] = useState(false);
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+    // Track selection state
+    const selection = useTrackSelection();
 
     // Filter and sort tracks
     const filteredTracks = useMemo(() => {
@@ -158,6 +162,12 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     }, [tracks, playlists, albums, artists, genres, playlistId, albumId, artistId, genreId, filter, searchQuery, isSearchActive, sortTracks]);
 
     const handleTrackPress = useCallback((track: Track, index: number) => {
+        // If in selection mode, toggle selection instead of playing
+        if (selection.isSelectionMode) {
+            selection.toggleTrack(track.id);
+            return;
+        }
+
         const sourceTypeMap: Record<FilterType, string> = {
             'all-songs': 'all',
             'favorites': 'custom',
@@ -176,7 +186,15 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
             id: playlistId || albumId || artistId || genreId,
         }, index, sortBy, sortAsc);
         onPlay?.();
-    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay, sortBy, sortAsc]);
+    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay, sortBy, sortAsc, selection]);
+
+    const handleTrackLongPress = useCallback((track: Track) => {
+        if (!selection.isSelectionMode) {
+            selection.enterSelectionMode(track);
+        } else {
+            selection.toggleTrack(track.id);
+        }
+    }, [selection]);
 
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
@@ -187,7 +205,10 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         <TrackListItem
             track={item}
             isPlaying={currentTrackId === item.id}
+            isSelected={selection.selectedTracks.has(item.id)}
+            showSelection={selection.isSelectionMode}
             onPress={() => handleTrackPress(item, index)}
+            onLongPress={() => handleTrackLongPress(item)}
             onMorePress={handleMorePress}
             rightElement={filter === 'most-played' || sortBy === 'playCount' ? (
                 <Text style={{
@@ -297,6 +318,18 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                 onClose={() => setShowTrackActions(false)}
                 onAddToQueue={(track) => addToQueue([track])}
             />
+
+            {/* Selection Toolbar */}
+            {selection.isSelectionMode && (
+                <SelectionToolbar
+                    selectionCount={selection.selectionCount}
+                    totalCount={filteredTracks.length}
+                    onClose={selection.exitSelectionMode}
+                    onSelectAll={() => selection.selectAll(filteredTracks)}
+                    getSelectedTracks={() => selection.getSelectedTracks(filteredTracks)}
+                    onActionComplete={selection.exitSelectionMode}
+                />
+            )}
         </View>
     );
 };

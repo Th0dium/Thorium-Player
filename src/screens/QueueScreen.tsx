@@ -22,7 +22,9 @@ import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
+import { useTrackSelection } from '@/hooks/useTrackSelection';
 import TrackListItem from '@/components/TrackListItem';
+import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
 import SortMenu from '@/components/SortMenu';
 import { Track, Queue, SortOption } from '@/types';
@@ -63,6 +65,9 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [showTrackActions, setShowTrackActions] = useState(false);
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+    // Track selection state
+    const selection = useTrackSelection();
 
     // Sync sorting state when queue changes
     useEffect(() => {
@@ -284,6 +289,15 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     }, []);
 
     const handleTrackPress = useCallback(async (filteredIndex: number) => {
+        // If in selection mode, toggle selection instead of playing
+        if (selection.isSelectionMode) {
+            const track = filteredTracks[filteredIndex];
+            if (track) {
+                selection.toggleTrack(track.id);
+            }
+            return;
+        }
+
         // Map filtered index back to full queue index when search is active
         let realIndex = filteredIndex;
         if (isSearchActive && searchQuery) {
@@ -298,7 +312,31 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         await skipToIndex(realIndex);
         // Ensure playback starts (important if player was paused or on first play)
         await usePlayerStore.getState().play();
-    }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks]);
+    }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks, selection]);
+
+    const handleTrackLongPress = useCallback((filteredIndex: number) => {
+        const track = filteredTracks[filteredIndex];
+        if (!track) return;
+
+        if (!selection.isSelectionMode) {
+            // Enter selection mode
+            selection.enterSelectionMode(track);
+        } else {
+            // Already in selection mode, toggle selection
+            selection.toggleTrack(track.id);
+        }
+    }, [filteredTracks, selection]);
+
+    const handleDeleteSelectedTracks = useCallback(async (tracks: Track[]) => {
+        // Delete tracks from queue by their IDs
+        const removeFromQueueFn = useQueueStore.getState().removeFromQueue;
+        tracks.forEach((track) => {
+            const index = queueTracks.findIndex(t => t.id === track.id);
+            if (index >= 0) {
+                removeFromQueueFn(index);
+            }
+        });
+    }, [queueTracks]);
 
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
@@ -319,6 +357,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         const isPlaying = realIndex === currentIndex;
         const isPast = realIndex < currentIndex;
         const isSearching = isSearchActive && !!searchQuery;
+        const isSelected = selection.selectedTracks.has(item.id);
 
         return (
             <View
@@ -345,16 +384,19 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     track={item}
                     index={realIndex}
                     isPlaying={isPlaying}
+                    isSelected={isSelected}
+                    showSelection={selection.isSelectionMode}
                     isPast={isPast}
                     showArtwork={true}
-                    showDragHandle={!isSearching}
-                    drag={isSearching ? undefined : drag}
+                    showDragHandle={!isSearching && !selection.isSelectionMode}
+                    drag={isSearching || selection.isSelectionMode ? undefined : drag}
                     onPress={() => handleTrackPress(filteredIndex)}
+                    onLongPress={() => handleTrackLongPress(filteredIndex)}
                     onMorePress={handleMorePress}
                 />
             </View>
         );
-    }, [currentIndex, handleTrackPress, removeFromQueue, isSearchActive, searchQuery, queueTracks]);
+    }, [currentIndex, handleTrackPress, handleTrackLongPress, handleMorePress, isSearchActive, searchQuery, queueTracks, selection]);
 
     // --- Render Queue Switcher Modal Item ---
     const renderQueueSwitcherItem = useCallback(({ item: meta }: { item: typeof queuesWithMetadata[0] }) => {
@@ -635,6 +677,19 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 }}
                 showRemove={true}
             />
+
+            {/* Selection Toolbar */}
+            {selection.isSelectionMode && (
+                <SelectionToolbar
+                    selectionCount={selection.selectionCount}
+                    totalCount={queueTracks.length}
+                    onClose={selection.exitSelectionMode}
+                    onSelectAll={() => selection.selectAll(queueTracks)}
+                    getSelectedTracks={() => selection.getSelectedTracks(queueTracks)}
+                    onActionComplete={selection.exitSelectionMode}
+                    onDeleteTracks={handleDeleteSelectedTracks}
+                />
+            )}
         </GestureHandlerRootView>
     );
 };

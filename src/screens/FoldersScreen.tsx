@@ -15,9 +15,11 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useTheme } from '@/context/ThemeContext';
+import { useTrackSelection } from '@/hooks/useTrackSelection';
 import { Folder, Track } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import TrackListItem from '@/components/TrackListItem';
+import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
 
 interface FoldersScreenProps {
@@ -35,6 +37,9 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
     const [currentPath, setCurrentPath] = useState<string[]>([]);
     const [showTrackActions, setShowTrackActions] = useState(false);
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+    // Track selection state
+    const selection = useTrackSelection();
 
     const folders = useLibraryStore(state => state.folders);
     const tracks = useLibraryStore(state => state.tracks);
@@ -116,6 +121,12 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
     }, []);
 
     const handleTrackPress = useCallback(async (track: Track, index: number) => {
+        // If in selection mode, toggle selection instead of playing
+        if (selection.isSelectionMode) {
+            selection.toggleTrack(track.id);
+            return;
+        }
+
         // Find index within tracks only
         const trackIndex = tracksInCurrentFolder.findIndex(t => t.id === track.id);
         await createQueue(tracksInCurrentFolder, {
@@ -123,7 +134,21 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
             name: currentPath.length > 0 ? currentPath[currentPath.length - 1] : 'Root',
         }, trackIndex);
         onPlay?.();
-    }, [tracksInCurrentFolder, currentPath, createQueue, onPlay]);
+    }, [tracksInCurrentFolder, currentPath, createQueue, onPlay, selection]);
+
+    const handleTrackLongPress = useCallback((track: Track) => {
+        if (!selection.isSelectionMode) {
+            selection.enterSelectionMode(track);
+        } else {
+            selection.toggleTrack(track.id);
+        }
+    }, [selection]);
+
+    const handleDeleteSelectedTracks = useCallback(async (tracks: Track[]) => {
+        // For FoldersScreen, we just need to notify or remove from queue if needed
+        // Actual deletion of files would require additional permissions
+        // For now, just close selection mode
+    }, []);
 
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
@@ -188,7 +213,10 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                 <TrackListItem
                     track={track}
                     isPlaying={currentTrack?.id === track.id && isPlaying}
+                    isSelected={selection.selectedTracks.has(track.id)}
+                    showSelection={selection.isSelectionMode}
                     onPress={() => handleTrackPress(track, index)}
+                    onLongPress={() => handleTrackLongPress(track)}
                     onMorePress={handleMorePress}
                 />
             );
@@ -287,6 +315,18 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                 onClose={() => setShowTrackActions(false)}
                 onAddToQueue={(track) => addToQueue([track])}
             />
+
+            {/* Selection Toolbar */}
+            {selection.isSelectionMode && (
+                <SelectionToolbar
+                    selectionCount={selection.selectionCount}
+                    totalCount={tracksInCurrentFolder.length}
+                    onClose={selection.exitSelectionMode}
+                    onSelectAll={() => selection.selectAll(tracksInCurrentFolder)}
+                    getSelectedTracks={() => selection.getSelectedTracks(tracksInCurrentFolder)}
+                    onActionComplete={selection.exitSelectionMode}
+                />
+            )}
         </View>
     );
 };

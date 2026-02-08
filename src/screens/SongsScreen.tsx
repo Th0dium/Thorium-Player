@@ -15,12 +15,14 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import TrackListItem from '@/components/TrackListItem';
+import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
 import AlphabetScroller from '@/components/AlphabetScroller';
 import EmptyState from '@/components/EmptyState';
 import SkeletonList from '@/components/SkeletonLoader';
 import SortMenu from '@/components/SortMenu';
 import { useSort } from '@/hooks/useSort';
+import { useTrackSelection } from '@/hooks/useTrackSelection';
 import { useTheme } from '@/context/ThemeContext';
 import { Track, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
@@ -35,10 +37,11 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
     const flatListRef = useRef<FlatList>(null);
     const { sortBy, sortAsc, handleSortChange, sortTracks } = useSort('title', true, 'all-songs');
     const [showSortMenu, setShowSortMenu] = useState(false);
-    const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
-    const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [showTrackActions, setShowTrackActions] = useState(false);
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+    // Track selection state
+    const selection = useTrackSelection();
 
     // Use individual selectors to prevent re-renders when unrelated state changes
     const tracks = useLibraryStore(state => state.tracks);
@@ -102,8 +105,8 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
     }, [alphabetIndex]);
 
     const handleTrackPress = useCallback(async (track: Track, index: number) => {
-        if (isSelectionMode) {
-            toggleTrackSelection(track.id);
+        if (selection.isSelectionMode) {
+            selection.toggleTrack(track.id);
             return;
         }
 
@@ -112,46 +115,19 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             name: searchQuery ? 'Search Results' : 'All Songs',
         }, index, sortBy, sortAsc);
         onPlay?.();
-    }, [filteredAndSortedTracks, isSelectionMode, searchQuery, createQueue, onPlay, sortBy, sortAsc]);
+    }, [filteredAndSortedTracks, selection, searchQuery, createQueue, onPlay, sortBy, sortAsc]);
 
     const handleTrackLongPress = useCallback((track: Track) => {
-        setIsSelectionMode(true);
-        setSelectedTracks(new Set([track.id]));
-    }, []);
-
-    const toggleTrackSelection = useCallback((trackId: string) => {
-        setSelectedTracks(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(trackId)) {
-                newSet.delete(trackId);
-            } else {
-                newSet.add(trackId);
-            }
-            if (newSet.size === 0) {
-                setIsSelectionMode(false);
-            }
-            return newSet;
-        });
-    }, []);
-
-    const exitSelectionMode = useCallback(() => {
-        setIsSelectionMode(false);
-        setSelectedTracks(new Set());
-    }, []);
-
-    const selectAll = useCallback(() => {
-        setSelectedTracks(new Set(filteredAndSortedTracks.map(t => t.id)));
-    }, [filteredAndSortedTracks]);
+        if (!selection.isSelectionMode) {
+            selection.enterSelectionMode(track);
+        } else {
+            selection.toggleTrack(track.id);
+        }
+    }, [selection]);
 
     const handleRefresh = useCallback(async () => {
         await scanForMusic();
     }, [scanForMusic]);
-
-    const handleAddSelectedToQueue = useCallback(async () => {
-        const selectedTrackList = filteredAndSortedTracks.filter(t => selectedTracks.has(t.id));
-        await addToQueue(selectedTrackList);
-        exitSelectionMode();
-    }, [filteredAndSortedTracks, selectedTracks, addToQueue, exitSelectionMode]);
 
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
@@ -163,13 +139,13 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             track={item}
             index={index}
             isPlaying={currentTrackId === item.id && isPlaying}
-            isSelected={selectedTracks.has(item.id)}
-            showSelection={isSelectionMode}
+            isSelected={selection.selectedTracks.has(item.id)}
+            showSelection={selection.isSelectionMode}
             onPress={() => handleTrackPress(item, index)}
             onLongPress={() => handleTrackLongPress(item)}
             onMorePress={handleMorePress}
         />
-    ), [currentTrackId, isPlaying, selectedTracks, isSelectionMode, handleTrackPress, handleTrackLongPress, handleMorePress]);
+    ), [currentTrackId, isPlaying, selection, handleTrackPress, handleTrackLongPress, handleMorePress]);
 
     const keyExtractor = useCallback((item: Track) => item.id, []);
 
@@ -183,24 +159,8 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
 
     return (
         <View style={styles.container}>
-            {/* Selection header */}
-            {isSelectionMode && (
-                <View style={styles.selectionHeader}>
-                    <TouchableOpacity onPress={exitSelectionMode} style={styles.selectionButton}>
-                        <Icon name="close" size={24} color={colors.textPrimary} />
-                    </TouchableOpacity>
-                    <Text style={styles.selectionCount}>{selectedTracks.size} selected</Text>
-                    <TouchableOpacity onPress={selectAll} style={styles.selectionButton}>
-                        <Icon name="select-all" size={24} color={colors.textPrimary} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleAddSelectedToQueue} style={styles.selectionButton}>
-                        <Icon name="playlist-plus" size={24} color={colors.primary} />
-                    </TouchableOpacity>
-                </View>
-            )}
-
             {/* Sort bar */}
-            {!isSelectionMode && (
+            {!selection.isSelectionMode && (
                 <View style={styles.sortBar}>
                     <Text style={styles.trackCount}>{filteredAndSortedTracks.length} songs</Text>
                     <TouchableOpacity
@@ -260,7 +220,7 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             )}
 
             {/* Alphabet scroller */}
-            {filteredAndSortedTracks.length > 20 && !isSelectionMode && (
+            {filteredAndSortedTracks.length > 20 && !selection.isSelectionMode && (
                 <AlphabetScroller
                     onLetterChange={handleLetterChange}
                     activeLetters={activeLetters}
@@ -277,12 +237,25 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             />
 
             {/* Track Actions Modal */}
+            {/* Track Actions Modal */}
             <TrackActionsModal
                 visible={showTrackActions}
                 track={selectedTrack}
                 onClose={() => setShowTrackActions(false)}
                 onAddToQueue={(track) => addToQueue([track])}
             />
+
+            {/* Selection Toolbar */}
+            {selection.isSelectionMode && (
+                <SelectionToolbar
+                    selectionCount={selection.selectionCount}
+                    totalCount={filteredAndSortedTracks.length}
+                    onClose={selection.exitSelectionMode}
+                    onSelectAll={() => selection.selectAll(filteredAndSortedTracks)}
+                    getSelectedTracks={() => selection.getSelectedTracks(filteredAndSortedTracks)}
+                    onActionComplete={selection.exitSelectionMode}
+                />
+            )}
         </View>
     );
 };
