@@ -18,6 +18,8 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
 import TrackListItem from '@/components/TrackListItem';
 import EmptyState from '@/components/EmptyState';
+import SortMenu from '@/components/SortMenu';
+import { useSort } from '@/hooks/useSort';
 import { Track, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
@@ -58,27 +60,12 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     const createQueue = useQueueStore(state => state.createQueue);
 
     // Sorting state
-    const [sortBy, setSortBy] = useState<SortOption>(() => {
-        if (filter === 'most-played') return 'playCount';
-        if (filter === 'recently-added') return 'dateAdded';
-        if (filter === 'recently-played') return 'dateAdded';
-        return 'title';
-    });
-    const [sortAsc, setSortAsc] = useState(
-        filter !== 'most-played' && 
-        filter !== 'recently-added' && 
-        filter !== 'recently-played'
+    const { sortBy, sortAsc, handleSortChange, sortTracks } = useSort(
+        filter === 'most-played' ? 'playCount' : (filter === 'recently-added' || filter === 'recently-played' ? 'dateAdded' : 'title'),
+        filter !== 'most-played' && filter !== 'recently-added' && filter !== 'recently-played',
+        `list-${filter}-${playlistId || albumId || artistId || genreId || 'default'}`
     );
     const [showSortMenu, setShowSortMenu] = useState(false);
-
-    const sortOptions: { key: SortOption; label: string; icon: string }[] = [
-        { key: 'title', label: 'Title', icon: 'sort-alphabetical-ascending' },
-        { key: 'artist', label: 'Artist', icon: 'account-music' },
-        { key: 'album', label: 'Album', icon: 'album' },
-        { key: 'dateAdded', label: 'Date Added', icon: 'calendar-plus' },
-        { key: 'duration', label: 'Duration', icon: 'clock-outline' },
-        { key: 'playCount', label: 'Play Count', icon: 'chart-bar' },
-    ];
 
     // Filter and sort tracks
     const filteredTracks = useMemo(() => {
@@ -152,32 +139,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         }
 
         // 2. Sorting
-        result.sort((a, b) => {
-            let comparison = 0;
-            switch (sortBy) {
-                case 'artist':
-                    comparison = (a.artist || '').localeCompare(b.artist || '');
-                    if (comparison === 0) comparison = (a.title || '').localeCompare(b.title || '');
-                    break;
-                case 'album':
-                    comparison = (a.album || '').localeCompare(b.album || '');
-                    if (comparison === 0) comparison = (a.title || '').localeCompare(b.title || '');
-                    break;
-                case 'dateAdded':
-                    comparison = (a.dateAdded || 0) - (b.dateAdded || 0);
-                    break;
-                case 'duration':
-                    comparison = (a.duration || 0) - (b.duration || 0);
-                    break;
-                case 'playCount':
-                    comparison = (a.playCount || 0) - (b.playCount || 0);
-                    break;
-                case 'title':
-                default:
-                    comparison = (a.title || '').localeCompare(b.title || '');
-            }
-            return sortAsc ? comparison : -comparison;
-        });
+        result = sortTracks(result);
 
         // 3. Search Filtering
         if (isSearchActive && searchQuery) {
@@ -190,7 +152,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         }
 
         return result;
-    }, [tracks, playlists, albums, artists, genres, playlistId, albumId, artistId, genreId, filter, searchQuery, isSearchActive, sortBy, sortAsc]);
+    }, [tracks, playlists, albums, artists, genres, playlistId, albumId, artistId, genreId, filter, searchQuery, isSearchActive, sortTracks]);
 
     const handleTrackPress = useCallback((track: Track, index: number) => {
         const sourceTypeMap: Record<FilterType, string> = {
@@ -209,19 +171,9 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
             type: sourceTypeMap[filter] as any,
             name: title,
             id: playlistId || albumId || artistId || genreId,
-        }, index);
+        }, index, sortBy, sortAsc);
         onPlay?.();
-    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay]);
-
-    const handleSortOptionPress = (option: SortOption) => {
-        if (sortBy === option) {
-            setSortAsc(!sortAsc);
-        } else {
-            setSortBy(option);
-            setSortAsc(option === 'title' || option === 'artist' || option === 'album');
-        }
-        setShowSortMenu(false);
-    };
+    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay, sortBy, sortAsc]);
 
     const renderItem = useCallback(({ item, index }: { item: Track; index: number }) => (
         <TrackListItem
@@ -249,6 +201,18 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         index,
     }), []);
 
+    const getSortLabel = (option: SortOption) => {
+        switch (option) {
+            case 'title': return 'Title';
+            case 'artist': return 'Artist';
+            case 'album': return 'Album';
+            case 'dateAdded': return 'Date Added';
+            case 'duration': return 'Duration';
+            case 'playCount': return 'Play Count';
+            default: return option;
+        }
+    };
+
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Header with back button */}
@@ -274,7 +238,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                             onPress={() => setShowSortMenu(true)}
                         >
                             <Text style={[styles.sortText, { color: colors.primary }]}>
-                                {sortOptions.find(o => o.key === sortBy)?.label}
+                                {getSortLabel(sortBy)}
                             </Text>
                             <Icon 
                                 name={sortAsc ? 'arrow-up' : 'arrow-down'} 
@@ -308,53 +272,14 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                 }
             />
 
-            {/* Sort Menu Modal */}
-            <Modal
+            {/* Sort Menu */}
+            <SortMenu
                 visible={showSortMenu}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowSortMenu(false)}
-            >
-                <TouchableWithoutFeedback onPress={() => setShowSortMenu(false)}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={[styles.sortMenu, { backgroundColor: colors.surfaceElevated }]}>
-                                <Text style={[styles.menuTitle, { color: colors.textPrimary }]}>Sort by</Text>
-                                {sortOptions.map((option) => (
-                                    <TouchableOpacity
-                                        key={option.key}
-                                        style={[
-                                            styles.sortOption,
-                                            sortBy === option.key && { backgroundColor: colors.primary + '15' }
-                                        ]}
-                                        onPress={() => handleSortOptionPress(option.key)}
-                                    >
-                                        <Icon 
-                                            name={option.icon} 
-                                            size={20} 
-                                            color={sortBy === option.key ? colors.primary : colors.textSecondary} 
-                                        />
-                                        <Text style={[
-                                            styles.sortOptionLabel,
-                                            { color: sortBy === option.key ? colors.primary : colors.textPrimary }
-                                        ]}>
-                                            {option.label}
-                                        </Text>
-                                        {sortBy === option.key && (
-                                            <Icon 
-                                                name={sortAsc ? 'arrow-up' : 'arrow-down'} 
-                                                size={18} 
-                                                color={colors.primary} 
-                                                style={{ marginLeft: 'auto' }}
-                                            />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </Modal>
+                onClose={() => setShowSortMenu(false)}
+                sortBy={sortBy}
+                sortAsc={sortAsc}
+                onSortChange={handleSortChange}
+            />
         </View>
     );
 };

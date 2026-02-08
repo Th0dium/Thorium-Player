@@ -1,6 +1,7 @@
 // Settings Store - UI preferences, navigation tabs, and app behavior settings
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SortOption } from '@/types';
 
 const SETTINGS_STORAGE_KEY = '@thorium/ui_settings';
 let settingsPersistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -10,6 +11,11 @@ export type TabId = 'queue' | 'nowPlaying' | 'library' | 'folders' | 'albums' | 
 export type ThemeOption = 'dark' | 'light' | 'system' | 'amoled';
 export type FolderViewOption = 'linear' | 'hierarchical';
 export type QueueBehavior = 'addToEnd' | 'playNext' | 'clearAndPlay';
+
+export interface ViewSortConfig {
+    sortBy: SortOption;
+    sortAsc: boolean;
+}
 
 export interface TabConfig {
     id: TabId;
@@ -59,6 +65,9 @@ interface UISettings {
     // Library scanning
     scanFolders: string[]; // Paths to scan for music files
 
+    // Sorting persistence
+    sortConfigs: Record<string, ViewSortConfig>;
+
     // Navigation state persistence
     librarySubScreen: string | null;
     librarySubTitle: string;
@@ -86,12 +95,14 @@ interface SettingsStore extends UISettings {
     setReducedAnimations: (value: boolean) => void;
     setScanFolders: (folders: string[]) => void;
     setLibraryNavigation: (screen: string | null, title?: string) => void;
+    setSortConfig: (viewId: string, sortBy: SortOption, sortAsc: boolean) => void;
 
     // Bulk update
     updateSettings: (settings: Partial<UISettings>) => void;
 
     // Helpers
     getTabConfig: () => TabConfig[];
+    getSortConfig: (viewId: string, defaultSortBy?: SortOption, defaultSortAsc?: boolean) => ViewSortConfig;
 }
 
 const DEFAULT_SETTINGS: UISettings = {
@@ -108,6 +119,7 @@ const DEFAULT_SETTINGS: UISettings = {
     closeOnQueueEnd: false,
     reducedAnimations: false,
     scanFolders: [],
+    sortConfigs: {},
     librarySubScreen: null,
     librarySubTitle: '',
 };
@@ -157,6 +169,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
                     closeOnQueueEnd: state.closeOnQueueEnd,
                     reducedAnimations: state.reducedAnimations,
                     scanFolders: state.scanFolders,
+                    sortConfigs: state.sortConfigs,
                     librarySubScreen: state.librarySubScreen,
                     librarySubTitle: state.librarySubTitle,
                 };
@@ -238,6 +251,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         get().saveSettings();
     },
 
+    setSortConfig: (viewId, sortBy, sortAsc) => {
+        set(state => ({
+            sortConfigs: {
+                ...state.sortConfigs,
+                [viewId]: { sortBy, sortAsc }
+            }
+        }));
+        get().saveSettings();
+    },
+
     // Bulk update (used by onboarding)
     updateSettings: (settings) => {
         set(settings);
@@ -250,5 +273,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         return selectedTabs
             .map(id => ALL_TABS.find(tab => tab.id === id))
             .filter((tab): tab is TabConfig => tab !== undefined);
+    },
+
+    getSortConfig: (viewId, defaultSortBy = 'title', defaultSortAsc = true) => {
+        const { sortConfigs } = get();
+        return sortConfigs[viewId] || { sortBy: defaultSortBy, sortAsc: defaultSortAsc };
     },
 }));

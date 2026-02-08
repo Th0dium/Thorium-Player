@@ -23,6 +23,7 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
 import TrackListItem from '@/components/TrackListItem';
+import SortMenu from '@/components/SortMenu';
 import { Track, Queue, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -67,15 +68,6 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
             setSortAsc(currentQueue.sortAsc ?? true);
         }
     }, [currentQueue?.id]);
-
-    const sortOptions: { key: SortOption; label: string; icon: string }[] = [
-        { key: 'title', label: 'Title', icon: 'sort-alphabetical-ascending' },
-        { key: 'artist', label: 'Artist', icon: 'account-music' },
-        { key: 'album', label: 'Album', icon: 'album' },
-        { key: 'dateAdded', label: 'Date Added', icon: 'calendar-plus' },
-        { key: 'duration', label: 'Duration', icon: 'clock-outline' },
-        { key: 'playCount', label: 'Play Count', icon: 'chart-bar' },
-    ];
 
     // Track measured heights of rendered items for accurate scrollToIndex
     const itemHeights = useRef(new Map<number, number>());
@@ -346,7 +338,6 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     index={realIndex}
                     isPlaying={isPlaying}
                     isPast={isPast}
-                    showIndex={true}
                     showArtwork={true}
                     showDragHandle={!isSearching}
                     showRemoveButton={true}
@@ -616,62 +607,15 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 </TouchableOpacity>
             </Modal>
 
-            {/* Sort Menu Modal */}
-            <Modal
+            {/* Sort Menu */}
+            <SortMenu
                 visible={showSortMenu}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowSortMenu(false)}
-            >
-                <TouchableOpacity 
-                    style={styles.modalOverlay} 
-                    activeOpacity={1}
-                    onPress={() => setShowSortMenu(false)}
-                >
-                    <View 
-                        style={[
-                            styles.sortMenu, 
-                            { 
-                                backgroundColor: colors.surfaceElevated,
-                                marginBottom: insets.bottom + 100 // Position above mini player
-                            }
-                        ]}
-                        onStartShouldSetResponder={() => true}
-                    >
-                        <Text style={[styles.menuTitle, { color: colors.textPrimary }]}>Sort Queue by</Text>
-                        {sortOptions.map((option) => (
-                            <TouchableOpacity
-                                key={option.key}
-                                style={[
-                                    styles.sortOption,
-                                    sortBy === option.key && { backgroundColor: colors.primary + '15' }
-                                ]}
-                                onPress={() => handleSortOptionPress(option.key)}
-                            >
-                                <Icon 
-                                    name={option.icon} 
-                                    size={20} 
-                                    color={sortBy === option.key ? colors.primary : colors.textSecondary} 
-                                />
-                                <Text style={[
-                                    styles.sortOptionLabel,
-                                    { color: sortBy === option.key ? colors.primary : colors.textPrimary }
-                                ]}>
-                                    {option.label}
-                                </Text>
-                                {sortBy === option.key && (
-                                    <Icon 
-                                        name={sortAsc ? 'arrow-up' : 'arrow-down'} 
-                                        size={18} 
-                                        color={colors.primary} 
-                                        style={{ marginLeft: 'auto' }}
-                                    />
-                                )}
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </TouchableOpacity>
-            </Modal>
+                onClose={() => setShowSortMenu(false)}
+                sortBy={sortBy}
+                sortAsc={sortAsc}
+                onSortChange={handleSortOptionPress}
+                title="Sort Queue by"
+            />
         </GestureHandlerRootView>
     );
 };

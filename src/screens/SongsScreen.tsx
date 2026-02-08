@@ -18,6 +18,8 @@ import TrackListItem from '@/components/TrackListItem';
 import AlphabetScroller from '@/components/AlphabetScroller';
 import EmptyState from '@/components/EmptyState';
 import SkeletonList from '@/components/SkeletonLoader';
+import SortMenu from '@/components/SortMenu';
+import { useSort } from '@/hooks/useSort';
 import { useTheme } from '@/context/ThemeContext';
 import { Track, SortOption } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
@@ -30,8 +32,7 @@ interface SongsScreenProps {
 const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) => {
     const { colors } = useTheme();
     const flatListRef = useRef<FlatList>(null);
-    const [sortBy, setSortBy] = useState<SortOption>('title');
-    const [sortAsc, setSortAsc] = useState(true);
+    const { sortBy, sortAsc, handleSortChange, sortTracks } = useSort('title', true, 'all-songs');
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [selectedTracks, setSelectedTracks] = useState<Set<string>>(new Set());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -67,31 +68,9 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             );
         }
 
-        // Sort tracks
-        result.sort((a, b) => {
-            let comparison = 0;
-            switch (sortBy) {
-                case 'title':
-                    comparison = (a.title || '').localeCompare(b.title || '');
-                    break;
-                case 'artist':
-                    comparison = (a.artist || '').localeCompare(b.artist || '');
-                    break;
-                case 'album':
-                    comparison = (a.album || '').localeCompare(b.album || '');
-                    break;
-                case 'duration':
-                    comparison = (a.duration || 0) - (b.duration || 0);
-                    break;
-                case 'dateAdded':
-                    comparison = (a.dateAdded || 0) - (b.dateAdded || 0);
-                    break;
-            }
-            return sortAsc ? comparison : -comparison;
-        });
-
-        return result;
-    }, [tracks, searchQuery, sortBy, sortAsc]);
+        // Sort tracks using the hook's logic
+        return sortTracks(result);
+    }, [tracks, searchQuery, sortTracks]);
 
     // Get alphabet index for scroller
     const alphabetIndex = useMemo(() => {
@@ -128,9 +107,9 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
         await createQueue(filteredAndSortedTracks, {
             type: 'all',
             name: searchQuery ? 'Search Results' : 'All Songs',
-        }, index);
+        }, index, sortBy, sortAsc);
         onPlay?.();
-    }, [filteredAndSortedTracks, isSelectionMode, searchQuery, createQueue, onPlay]);
+    }, [filteredAndSortedTracks, isSelectionMode, searchQuery, createQueue, onPlay, sortBy, sortAsc]);
 
     const handleTrackLongPress = useCallback((track: Track) => {
         setIsSelectionMode(true);
@@ -191,14 +170,6 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
         index,
     }), []);
 
-    const sortOptions: { key: SortOption; label: string; icon: string }[] = [
-        { key: 'title', label: 'Title', icon: 'sort-alphabetical-ascending' },
-        { key: 'artist', label: 'Artist', icon: 'account-music' },
-        { key: 'album', label: 'Album', icon: 'album' },
-        { key: 'duration', label: 'Duration', icon: 'timer' },
-        { key: 'dateAdded', label: 'Date Added', icon: 'calendar' },
-    ];
-
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     return (
@@ -235,49 +206,6 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
                             color={colors.textSecondary}
                         />
                     </TouchableOpacity>
-                </View>
-            )}
-
-            {/* Sort menu dropdown */}
-            {showSortMenu && (
-                <View style={styles.sortMenu}>
-                    {sortOptions.map(option => (
-                        <TouchableOpacity
-                            key={option.key}
-                            style={[
-                                styles.sortOption,
-                                sortBy === option.key && { backgroundColor: colors.primary + '20' }
-                            ]}
-                            onPress={() => {
-                                if (sortBy === option.key) {
-                                    setSortAsc(!sortAsc);
-                                } else {
-                                    setSortBy(option.key);
-                                    setSortAsc(true);
-                                }
-                                setShowSortMenu(false);
-                            }}
-                        >
-                            <Icon
-                                name={option.icon}
-                                size={20}
-                                color={sortBy === option.key ? colors.primary : colors.textSecondary}
-                            />
-                            <Text style={[
-                                styles.sortOptionText,
-                                sortBy === option.key && { color: colors.primary }
-                            ]}>
-                                {option.label}
-                            </Text>
-                            {sortBy === option.key && (
-                                <Icon
-                                    name={sortAsc ? 'arrow-up' : 'arrow-down'}
-                                    size={16}
-                                    color={colors.primary}
-                                />
-                            )}
-                        </TouchableOpacity>
-                    ))}
                 </View>
             )}
 
@@ -329,6 +257,15 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
                     activeLetters={activeLetters}
                 />
             )}
+
+            {/* Sort Menu */}
+            <SortMenu
+                visible={showSortMenu}
+                onClose={() => setShowSortMenu(false)}
+                sortBy={sortBy}
+                sortAsc={sortAsc}
+                onSortChange={handleSortChange}
+            />
         </View>
     );
 };
@@ -383,33 +320,6 @@ const createStyles = (colors: any) => StyleSheet.create({
         color: colors.textSecondary,
         marginHorizontal: spacing.xs,
         textTransform: 'capitalize',
-    },
-    sortMenu: {
-        position: 'absolute',
-        top: 100,
-        right: spacing.md,
-        backgroundColor: colors.surface,
-        borderRadius: borderRadius.md,
-        paddingVertical: spacing.xs,
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        zIndex: 1000,
-    },
-    sortOption: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.md,
-        minWidth: 160,
-    },
-    sortOptionText: {
-        flex: 1,
-        fontSize: typography.sizes.md,
-        color: colors.textPrimary,
-        marginLeft: spacing.sm,
     },
     listContent: {
         paddingBottom: 120,

@@ -18,7 +18,7 @@ interface QueueStore {
 
     // Actions
     loadQueues: () => Promise<void>;
-    createQueue: (tracks: Track[], source: QueueSource, startIndex?: number) => Promise<Queue>;
+    createQueue: (tracks: Track[], source: QueueSource, startIndex?: number, sortBy?: SortOption, sortAsc?: boolean) => Promise<Queue>;
     switchToQueue: (queueId: string, startFromIndex?: number) => Promise<void>;
     switchQueue: (index: number) => Promise<void>; // Switch by index in queues array
     deleteQueue: (queueId: string) => Promise<void>;
@@ -115,7 +115,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
     },
 
     // Create a new queue and start playing
-    createQueue: async (tracks, source, startIndex = 0) => {
+    createQueue: async (tracks, source, startIndex = 0, sortBy, sortAsc) => {
         const { queues, deleteQueue } = get();
 
         // Find if a queue with same name and same source type already exists
@@ -139,6 +139,8 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
             currentIndex: startIndex,
             lastPlayed: Date.now(),
             source,
+            sortBy,
+            sortAsc,
         };
 
         // Add to queues array and update local state (optimistic)
