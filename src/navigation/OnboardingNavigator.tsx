@@ -61,10 +61,7 @@ const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({ onComplete })
     const handleComplete = async () => {
         // Save the selected scan folders to settings for future use
         if (scannerSettings?.folderPaths) {
-            console.log('Saving scan folders to settings:', scannerSettings.folderPaths);
             useSettingsStore.getState().setScanFolders(scannerSettings.folderPaths);
-        } else {
-            console.log('No scanner settings found, scannerSettings:', scannerSettings);
         }
         await setOnboardingComplete();
         onComplete();

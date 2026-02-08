@@ -47,8 +47,6 @@ const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack 
     const handleContinue = () => {
         // Save settings to store/database
         const folderPaths = detectedFolders.map(f => f.path);
-        console.log('ScannerSetupScreen - detected folders:', detectedFolders);
-        console.log('ScannerSetupScreen - folder paths to send:', folderPaths);
         const settings = {
             folderPaths,
             excludeRingtones,
@@ -56,7 +54,6 @@ const ScannerSetupScreen: React.FC<ScannerSetupScreenProps> = ({ onNext, onBack 
             excludeShortFiles,
             minDuration,
         };
-        console.log('ScannerSetupScreen - sending settings:', settings);
         onNext(settings);
     };
 
