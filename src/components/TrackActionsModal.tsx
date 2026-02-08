@@ -61,8 +61,12 @@ export const TrackActionsModal: React.FC<TrackActionsModalProps> = ({
     };
 
     const handleAddToPlaylist = () => {
-        onAddToPlaylist?.(track);
         setShowPlaylistModal(true);
+    };
+
+    const handleClosePlaylistModal = () => {
+        setShowPlaylistModal(false);
+        onClose(); // Also close the main modal
     };
 
     const handleRemove = () => {
@@ -80,119 +84,118 @@ export const TrackActionsModal: React.FC<TrackActionsModalProps> = ({
         onClose();
     };
 
-    return (
-        <>
-            <Modal
-                visible={visible && !showPlaylistModal}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={onClose}
-            >
-                <TouchableOpacity
-                    activeOpacity={1}
-                    style={[styles.overlay, { backgroundColor: colors.background + 'CC' }]}
-                    onPress={onClose}
-                >
-                    <SafeAreaView style={styles.container}>
-                        <View style={[styles.modal, { backgroundColor: colors.surface }]}>
-                            {/* Track Info Header */}
-                            <View style={styles.header}>
-                                <Text style={[styles.trackTitle, { color: colors.text }]} numberOfLines={1}>
-                                    {track.title}
-                                </Text>
-                                <Text style={[styles.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>
-                                    {track.artist}
-                                </Text>
-                            </View>
-
-                            {/* Divider */}
-                            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-                            {/* Actions */}
-                            <View style={styles.actions}>
-                                {/* Add to Queue */}
-                                <TouchableOpacity
-                                    style={[styles.action, { borderBottomColor: colors.border }]}
-                                    onPress={handleAddToQueue}
-                                >
-                                    <Icon name="plus-circle-outline" size={22} color={colors.primary} />
-                                    <Text style={[styles.actionText, { color: colors.text }]}>Add to Queue</Text>
-                                </TouchableOpacity>
-
-                                {/* Play Next */}
-                                <TouchableOpacity
-                                    style={[styles.action, { borderBottomColor: colors.border }]}
-                                    onPress={handlePlayNext}
-                                >
-                                    <Icon name="fast-forward-10" size={22} color={colors.primary} />
-                                    <Text style={[styles.actionText, { color: colors.text }]}>Play Next</Text>
-                                </TouchableOpacity>
-
-                                {/* Add to Playlist */}
-                                <TouchableOpacity
-                                    style={[styles.action, { borderBottomColor: colors.border }]}
-                                    onPress={handleAddToPlaylist}
-                                >
-                                    <Icon name="playlist-plus" size={22} color={colors.primary} />
-                                    <Text style={[styles.actionText, { color: colors.text }]}>Add to Playlist</Text>
-                                </TouchableOpacity>
-
-                                {/* View Artist */}
-                                {track.artist && track.artist !== 'Unknown Artist' && (
-                                    <TouchableOpacity
-                                        style={[styles.action, { borderBottomColor: colors.border }]}
-                                        onPress={handleViewArtist}
-                                    >
-                                        <Icon name="account-music-outline" size={22} color={colors.primary} />
-                                        <Text style={[styles.actionText, { color: colors.text }]}>View Artist</Text>
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* View Album */}
-                                {track.album && track.album !== 'Unknown Album' && (
-                                    <TouchableOpacity
-                                        style={[styles.action, { borderBottomColor: colors.border }]}
-                                        onPress={handleViewAlbum}
-                                    >
-                                        <Icon name="album" size={22} color={colors.primary} />
-                                        <Text style={[styles.actionText, { color: colors.text }]}>View Album</Text>
-                                    </TouchableOpacity>
-                                )}
-
-                                {/* Remove */}
-                                {showRemove && (
-                                    <TouchableOpacity
-                                        style={[styles.action, styles.actionDanger]}
-                                        onPress={handleRemove}
-                                    >
-                                        <Icon name="trash-can-outline" size={22} color={colors.error} />
-                                        <Text style={[styles.actionText, { color: colors.error }]}>Remove</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            {/* Cancel Button */}
-                            <TouchableOpacity
-                                style={[styles.cancelButton, { backgroundColor: colors.backgroundTertiary }]}
-                                onPress={onClose}
-                            >
-                                <Text style={[styles.cancelText, { color: colors.text }]}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </SafeAreaView>
-                </TouchableOpacity>
-            </Modal>
-
-            {/* Add to Playlist Modal */}
+    // If playlist modal is showing, only render that modal
+    if (showPlaylistModal) {
+        return (
             <AddToPlaylistModal
-                visible={showPlaylistModal}
+                visible={true}
                 track={track}
-                onClose={() => {
-                    setShowPlaylistModal(false);
-                    onClose();
-                }}
+                onClose={handleClosePlaylistModal}
             />
-        </>
+        );
+    }
+
+    return (
+        <Modal
+            visible={visible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={onClose}
+        >
+            <TouchableOpacity
+                activeOpacity={1}
+                style={[styles.overlay, { backgroundColor: colors.background + 'CC' }]}
+                onPress={onClose}
+            >
+                <SafeAreaView style={styles.container}>
+                    <View style={[styles.modal, { backgroundColor: colors.surface }]}>
+                        {/* Track Info Header */}
+                        <View style={styles.header}>
+                            <Text style={[styles.trackTitle, { color: colors.text }]} numberOfLines={1}>
+                                {track.title}
+                            </Text>
+                            <Text style={[styles.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>
+                                {track.artist}
+                            </Text>
+                        </View>
+
+                        {/* Divider */}
+                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                        {/* Actions */}
+                        <View style={styles.actions}>
+                            {/* Add to Queue */}
+                            <TouchableOpacity
+                                style={[styles.action, { borderBottomColor: colors.border }]}
+                                onPress={handleAddToQueue}
+                            >
+                                <Icon name="plus-circle-outline" size={22} color={colors.primary} />
+                                <Text style={[styles.actionText, { color: colors.text }]}>Add to Queue</Text>
+                            </TouchableOpacity>
+
+                            {/* Play Next */}
+                            <TouchableOpacity
+                                style={[styles.action, { borderBottomColor: colors.border }]}
+                                onPress={handlePlayNext}
+                            >
+                                <Icon name="fast-forward-10" size={22} color={colors.primary} />
+                                <Text style={[styles.actionText, { color: colors.text }]}>Play Next</Text>
+                            </TouchableOpacity>
+
+                            {/* Add to Playlist */}
+                            <TouchableOpacity
+                                style={[styles.action, { borderBottomColor: colors.border }]}
+                                onPress={handleAddToPlaylist}
+                            >
+                                <Icon name="playlist-plus" size={22} color={colors.primary} />
+                                <Text style={[styles.actionText, { color: colors.text }]}>Add to Playlist</Text>
+                            </TouchableOpacity>
+
+                            {/* View Artist */}
+                            {track.artist && track.artist !== 'Unknown Artist' && (
+                                <TouchableOpacity
+                                    style={[styles.action, { borderBottomColor: colors.border }]}
+                                    onPress={handleViewArtist}
+                                >
+                                    <Icon name="account-music-outline" size={22} color={colors.primary} />
+                                    <Text style={[styles.actionText, { color: colors.text }]}>View Artist</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {/* View Album */}
+                            {track.album && track.album !== 'Unknown Album' && (
+                                <TouchableOpacity
+                                    style={[styles.action, { borderBottomColor: colors.border }]}
+                                    onPress={handleViewAlbum}
+                                >
+                                    <Icon name="album" size={22} color={colors.primary} />
+                                    <Text style={[styles.actionText, { color: colors.text }]}>View Album</Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Remove */}
+                            {showRemove && (
+                                <TouchableOpacity
+                                    style={[styles.action, styles.actionDanger]}
+                                    onPress={handleRemove}
+                                >
+                                    <Icon name="trash-can-outline" size={22} color={colors.error} />
+                                    <Text style={[styles.actionText, { color: colors.error }]}>Remove</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+
+                        {/* Cancel Button */}
+                        <TouchableOpacity
+                            style={[styles.cancelButton, { backgroundColor: colors.backgroundTertiary }]}
+                            onPress={onClose}
+                        >
+                            <Text style={[styles.cancelText, { color: colors.text }]}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </TouchableOpacity>
+        </Modal>
     );
 };
 

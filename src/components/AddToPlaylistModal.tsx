@@ -1,22 +1,22 @@
 /**
  * Add to Playlist Modal
- * Shows existing playlists and allows creating a new one
+ * Centered modal for managing playlist membership
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
     View,
     Text,
     Modal,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     FlatList,
     TextInput,
     Alert,
+    Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Playlist, Track } from '@/types';
+import { Track, Playlist } from '@/types';
 import { useTheme } from '@/context/ThemeContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { spacing, typography } from '@/constants/theme';
@@ -25,283 +25,376 @@ interface AddToPlaylistModalProps {
     visible: boolean;
     track: Track | null;
     onClose: () => void;
-    onSuccess?: (playlist: Playlist) => void;
 }
 
 export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
     visible,
     track,
     onClose,
-    onSuccess,
 }) => {
     const { colors } = useTheme();
     const playlists = useLibraryStore(state => state.playlists);
-    const createPlaylist = useLibraryStore(state => state.createPlaylist);
     const addToPlaylist = useLibraryStore(state => state.addToPlaylist);
+    const removeFromPlaylist = useLibraryStore(state => state.removeFromPlaylist);
+    const createPlaylist = useLibraryStore(state => state.createPlaylist);
 
-    const [showCreateMode, setShowCreateMode] = useState(false);
+    const [showCreateNew, setShowCreateNew] = useState(false);
     const [newPlaylistName, setNewPlaylistName] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
 
-    if (!track) return null;
+    // Get playlists that contain this track
+    const playlistsWithTrack = useMemo(() => {
+        if (!track) return new Set<string>();
+        return new Set(
+            playlists
+                .filter(p => p.trackIds.includes(track.id))
+                .map(p => p.id)
+        );
+    }, [playlists, track]);
 
-    const handleSelectPlaylist = async (playlist: Playlist) => {
-        if (isLoading) return;
-        
-        setIsLoading(true);
+    const handleTogglePlaylist = useCallback(async (playlist: Playlist) => {
+        if (!track) return;
+
+        const isInPlaylist = playlistsWithTrack.has(playlist.id);
+
         try {
-            await addToPlaylist(playlist.id, [track.id]);
-            Alert.alert('Success', `Added to "${playlist.name}"`);
-            onSuccess?.(playlist);
-            onClose();
+            if (isInPlaylist) {
+                await removeFromPlaylist(playlist.id, track.id);
+            } else {
+                await addToPlaylist(playlist.id, [track.id]);
+            }
         } catch (error) {
-            Alert.alert('Error', 'Failed to add track to playlist');
-            console.error('Error adding to playlist:', error);
-        } finally {
-            setIsLoading(false);
+            console.error('Error toggling playlist:', error);
+            Alert.alert('Error', 'Failed to update playlist');
         }
-    };
+    }, [track, playlistsWithTrack, addToPlaylist, removeFromPlaylist]);
 
-    const handleCreateAndAdd = async () => {
-        if (!newPlaylistName.trim()) {
+    const handleCreateNewPlaylist = useCallback(async () => {
+        if (!track || !newPlaylistName.trim()) {
             Alert.alert('Error', 'Please enter a playlist name');
             return;
         }
 
-        if (isLoading) return;
-
-        setIsLoading(true);
+        setIsCreating(true);
         try {
-            const playlist = await createPlaylist(newPlaylistName.trim(), [track.id]);
-            Alert.alert('Success', `Created "${playlist.name}" and added track`);
-            onSuccess?.(playlist);
-            onClose();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to create playlist');
-            console.error('Error creating playlist:', error);
-        } finally {
-            setIsLoading(false);
+            await createPlaylist(newPlaylistName.trim(), [track.id]);
             setNewPlaylistName('');
-            setShowCreateMode(false);
+            setShowCreateNew(false);
+        } catch (error) {
+            console.error('Error creating playlist:', error);
+            Alert.alert('Error', 'Failed to create playlist');
+        } finally {
+            setIsCreating(false);
         }
-    };
+    }, [track, newPlaylistName, createPlaylist]);
 
-    const renderPlaylistItem = ({ item: playlist }: { item: Playlist }) => (
-        <TouchableOpacity
-            style={[styles.playlistItem, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
-            onPress={() => handleSelectPlaylist(playlist)}
-            disabled={isLoading}
-            activeOpacity={0.7}
-        >
-            <Icon name="playlist-music" size={24} color={colors.primary} style={styles.playlistIcon} />
-            <View style={styles.playlistInfo}>
-                <Text style={[styles.playlistName, { color: colors.text }]} numberOfLines={1}>
-                    {playlist.name}
-                </Text>
-                <Text style={[styles.playlistCount, { color: colors.textSecondary }]}>
-                    {playlist.tracks?.length || 0} tracks
-                </Text>
-            </View>
-            <Icon name="chevron-right" size={20} color={colors.textTertiary} />
-        </TouchableOpacity>
-    );
+    const renderPlaylistItem = useCallback(({ item: playlist }: { item: Playlist }) => {
+        const isChecked = playlistsWithTrack.has(playlist.id);
+
+        return (
+            <TouchableOpacity
+                style={[styles.playlistItem, { borderBottomColor: colors.border }]}
+                onPress={() => handleTogglePlaylist(playlist)}
+                activeOpacity={0.7}
+            >
+                <View style={styles.playlistInfo}>
+                    <Icon name="playlist-music" size={20} color={colors.primary} />
+                    <View style={styles.playlistText}>
+                        <Text style={[styles.playlistName, { color: colors.text }]} numberOfLines={1}>
+                            {playlist.name}
+                        </Text>
+                        <Text style={[styles.playlistCount, { color: colors.textSecondary }]}>
+                            {playlist.trackCount || playlist.trackIds.length} songs
+                        </Text>
+                    </View>
+                </View>
+                <View style={[
+                    styles.checkbox,
+                    { borderColor: isChecked ? colors.primary : colors.border },
+                    isChecked && { backgroundColor: colors.primary }
+                ]}>
+                    {isChecked && (
+                        <Icon name="check" size={16} color="#FFF" />
+                    )}
+                </View>
+            </TouchableOpacity>
+        );
+    }, [playlistsWithTrack, colors, handleTogglePlaylist]);
+
+    const keyExtractor = useCallback((item: Playlist) => item.id, []);
+
+    if (!track) return null;
 
     return (
         <Modal
             visible={visible}
             transparent={true}
-            animationType="slide"
+            animationType="fade"
             onRequestClose={onClose}
         >
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-                {/* Header */}
-                <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                    <TouchableOpacity 
-                        onPress={onClose}
-                        disabled={isLoading}
+            <TouchableOpacity
+                activeOpacity={1}
+                style={[styles.overlay, { backgroundColor: 'rgba(0, 0, 0, 0.5)' }]}
+                onPress={onClose}
+            >
+                <View style={styles.centeredView}>
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => { }}
+                        style={[styles.modal, { backgroundColor: colors.surface }]}
                     >
-                        <Icon name="close" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>
-                        {showCreateMode ? 'Create Playlist' : 'Add to Playlist'}
-                    </Text>
-                    <View style={{ width: 24 }} />
-                </View>
+                        {/* Header with Save Button */}
+                        <View style={styles.header}>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>
+                                Add to Playlist
+                            </Text>
+                            <TouchableOpacity
+                                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                                onPress={onClose}
+                            >
+                                <Text style={styles.saveButtonText}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                {showCreateMode ? (
-                    // Create new playlist mode
-                    <View style={styles.createContainer}>
-                        <Text style={[styles.label, { color: colors.textSecondary }]}>
-                            Playlist Name
+                        {/* Track Info */}
+                        <Text style={[styles.trackInfo, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {track.title} • {track.artist}
                         </Text>
-                        <TextInput
-                            style={[
-                                styles.input,
-                                {
-                                    backgroundColor: colors.surface,
-                                    borderColor: colors.border,
-                                    color: colors.text,
-                                }
-                            ]}
-                            placeholder="Enter playlist name"
-                            placeholderTextColor={colors.textTertiary}
-                            value={newPlaylistName}
-                            onChangeText={setNewPlaylistName}
-                            editable={!isLoading}
-                        />
 
-                        <TouchableOpacity
-                            style={[styles.createButton, { backgroundColor: colors.primary }]}
-                            onPress={handleCreateAndAdd}
-                            disabled={isLoading || !newPlaylistName.trim()}
-                            activeOpacity={0.7}
-                        >
-                            {isLoading ? (
-                                <Text style={[styles.createButtonText, { opacity: 0.6 }]}>Creating...</Text>
-                            ) : (
-                                <Text style={styles.createButtonText}>Create & Add</Text>
-                            )}
-                        </TouchableOpacity>
+                        {/* Divider */}
+                        <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-                        <TouchableOpacity
-                            style={[styles.backButton, { backgroundColor: colors.backgroundTertiary }]}
-                            onPress={() => setShowCreateMode(false)}
-                            disabled={isLoading}
-                        >
-                            <Icon name="arrow-left" size={20} color={colors.text} />
-                            <Text style={[styles.backButtonText, { color: colors.text }]}>Back</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    // Playlist list mode
-                    <>
-                        <FlatList
-                            data={playlists}
-                            renderItem={renderPlaylistItem}
-                            keyExtractor={(item) => item.id}
-                            scrollEnabled={true}
-                            contentContainerStyle={styles.listContent}
-                            ListEmptyComponent={
-                                <View style={styles.emptyContainer}>
-                                    <Icon name="playlist-remove" size={48} color={colors.textSecondary} />
-                                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                        No playlists yet
-                                    </Text>
+                        {/* Content Area */}
+                        {showCreateNew ? (
+                            // Create New Playlist Form
+                            <View style={styles.content}>
+                                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                                    New Playlist
+                                </Text>
+                                <TextInput
+                                    style={[styles.input, {
+                                        backgroundColor: colors.backgroundTertiary,
+                                        color: colors.text,
+                                        borderColor: colors.border
+                                    }]}
+                                    placeholder="Playlist name"
+                                    placeholderTextColor={colors.textTertiary}
+                                    value={newPlaylistName}
+                                    onChangeText={setNewPlaylistName}
+                                    autoFocus
+                                    returnKeyType="done"
+                                    onSubmitEditing={handleCreateNewPlaylist}
+                                />
+                                <View style={styles.actionButtons}>
+                                    <TouchableOpacity
+                                        style={[styles.button, styles.buttonSecondary, { borderColor: colors.border }]}
+                                        onPress={() => {
+                                            setShowCreateNew(false);
+                                            setNewPlaylistName('');
+                                        }}
+                                    >
+                                        <Text style={[styles.buttonText, { color: colors.textSecondary }]}>
+                                            Cancel
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.button, styles.buttonPrimary, { backgroundColor: colors.primary }]}
+                                        onPress={handleCreateNewPlaylist}
+                                        disabled={isCreating || !newPlaylistName.trim()}
+                                    >
+                                        <Text style={styles.buttonTextPrimary}>
+                                            {isCreating ? 'Creating...' : 'Create'}
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
-                            }
-                        />
+                            </View>
+                        ) : (
+                            // Playlist List
+                            <View style={styles.content}>
+                                {playlists.length === 0 ? (
+                                    <View style={styles.emptyState}>
+                                        <Icon name="playlist-music-outline" size={40} color={colors.textTertiary} />
+                                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                            No playlists yet
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <FlatList
+                                        data={playlists}
+                                        renderItem={renderPlaylistItem}
+                                        keyExtractor={keyExtractor}
+                                        scrollEnabled={true}
+                                        showsVerticalScrollIndicator={false}
+                                    />
+                                )}
+                            </View>
+                        )}
 
-                        {/* Create new playlist button */}
-                        <TouchableOpacity
-                            style={[styles.createNewButton, { backgroundColor: colors.primary }]}
-                            onPress={() => setShowCreateMode(true)}
-                            disabled={isLoading}
-                        >
-                            <Icon name="plus-circle" size={20} color="#FFF" />
-                            <Text style={styles.createNewButtonText}>Create New Playlist</Text>
-                        </TouchableOpacity>
-                    </>
-                )}
-            </SafeAreaView>
+                        {/* Footer Buttons */}
+                        {!showCreateNew && (
+                            <View style={[styles.footer, { borderTopColor: colors.border }]}>
+                                <TouchableOpacity
+                                    style={[styles.footerButton, { backgroundColor: colors.backgroundTertiary }]}
+                                    onPress={() => setShowCreateNew(true)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Icon name="plus" size={18} color={colors.primary} />
+                                    <Text style={[styles.footerButtonText, { color: colors.primary }]}>
+                                        New Playlist
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </View>
+            </TouchableOpacity>
         </Modal>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    overlay: {
         flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    centeredView: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        width: '100%',
+    },
+    modal: {
+        borderRadius: 12,
+        width: '100%',
+        maxWidth: 420,
+        maxHeight: '70%',
+        overflow: 'hidden',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
     },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
+        alignItems: 'center',
         paddingHorizontal: spacing.lg,
         paddingVertical: spacing.md,
-        borderBottomWidth: 1,
     },
-    headerTitle: {
+    modalTitle: {
         fontSize: typography.sizes.lg,
         fontWeight: '600',
+        flex: 1,
     },
-    listContent: {
-        paddingVertical: spacing.xs,
-        paddingBottom: spacing.xl,
+    trackInfo: {
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.sm,
+        fontSize: typography.sizes.sm,
+        marginBottom: spacing.md,
+    },
+    divider: {
+        height: StyleSheet.hairlineWidth * 2,
+    },
+    content: {
+        maxHeight: 300,
     },
     playlistItem: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.lg,
-        borderBottomWidth: 1,
-    },
-    playlistIcon: {
-        marginRight: spacing.md,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     playlistInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        marginRight: spacing.md,
+    },
+    playlistText: {
+        marginLeft: spacing.md,
         flex: 1,
     },
     playlistName: {
         fontSize: typography.sizes.md,
         fontWeight: '500',
-        marginBottom: spacing.xs,
+        marginBottom: 2,
     },
     playlistCount: {
         fontSize: typography.sizes.sm,
     },
-    emptyContainer: {
-        flex: 1,
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 4,
+        borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: spacing.xxl,
+    },
+    emptyState: {
+        alignItems: 'center',
+        paddingVertical: spacing.xl,
+        paddingHorizontal: spacing.lg,
     },
     emptyText: {
-        fontSize: typography.sizes.md,
+        fontSize: typography.sizes.sm,
         marginTop: spacing.md,
+        textAlign: 'center',
     },
-    createNewButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginHorizontal: spacing.lg,
-        marginBottom: spacing.lg,
-        paddingVertical: spacing.md,
-        borderRadius: 8,
-        gap: spacing.sm,
-    },
-    createNewButtonText: {
-        color: '#FFF',
+    sectionTitle: {
         fontSize: typography.sizes.md,
         fontWeight: '600',
-    },
-    createContainer: {
-        flex: 1,
-        padding: spacing.lg,
-    },
-    label: {
-        fontSize: typography.sizes.md,
-        fontWeight: '500',
-        marginBottom: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.sm,
     },
     input: {
-        borderWidth: 1,
-        borderRadius: 8,
+        marginHorizontal: spacing.lg,
+        marginBottom: spacing.md,
+        paddingVertical: spacing.md,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.md,
+        borderRadius: 8,
         fontSize: typography.sizes.md,
-        marginBottom: spacing.lg,
+        borderWidth: 1,
     },
-    createButton: {
-        paddingVertical: spacing.md,
+    actionButtons: {
+        flexDirection: 'row',
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.md,
+        gap: spacing.sm,
+    },
+    button: {
+        flex: 1,
+        paddingVertical: spacing.sm,
         borderRadius: 8,
         alignItems: 'center',
-        marginBottom: spacing.md,
+        justifyContent: 'center',
     },
-    createButtonText: {
+    buttonSecondary: {
+        borderWidth: 1,
+    },
+    buttonPrimary: {
+        // backgroundColor set via inline style
+    },
+    buttonText: {
+        fontSize: typography.sizes.md,
+        fontWeight: '600',
+    },
+    buttonTextPrimary: {
         color: '#FFF',
         fontSize: typography.sizes.md,
         fontWeight: '600',
     },
-    backButton: {
+    footer: {
+        borderTopWidth: 1,
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+    },
+    footerButton: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -309,8 +402,20 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         gap: spacing.sm,
     },
-    backButtonText: {
+    footerButtonText: {
         fontSize: typography.sizes.md,
-        fontWeight: '500',
+        fontWeight: '600',
+    },
+    saveButton: {
+        paddingVertical: spacing.sm,
+        paddingHorizontal: spacing.lg,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    saveButtonText: {
+        color: '#FFF',
+        fontSize: typography.sizes.md,
+        fontWeight: '600',
     },
 });
