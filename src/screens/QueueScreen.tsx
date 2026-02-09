@@ -22,7 +22,7 @@ import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
-import { useTrackSelection } from '@/hooks/useTrackSelection';
+import { useUniversalSelection } from '@/hooks/useUniversalSelection';
 import TrackListItem from '@/components/TrackListItem';
 import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
@@ -69,8 +69,8 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     const [showTrackActions, setShowTrackActions] = useState(false);
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
-    // Track selection state
-    const selection = useTrackSelection();
+    // Track selection state (global, shared across all screens)
+    const selection = useUniversalSelection();
 
     // Extract only the selection state values we need to avoid stale closure issues
     // while still triggering re-renders when these specific values change

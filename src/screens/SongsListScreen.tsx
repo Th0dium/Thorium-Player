@@ -16,7 +16,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useQueueStore } from '@/store/queueStore';
-import { useTrackSelection } from '@/hooks/useTrackSelection';
+import { useUniversalSelection } from '@/hooks/useUniversalSelection';
 import TrackListItem from '@/components/TrackListItem';
 import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
@@ -72,7 +72,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     // Track selection state
-    const selection = useTrackSelection();
+    const selection = useUniversalSelection();
 
     // Extract only the selection state values we need to trigger re-renders
     const selectionState = useMemo(() => ({

@@ -12,7 +12,7 @@
 
 import React, { useCallback } from 'react';
 import { View, FlatList, ViewStyle } from 'react-native';
-import { useTrackSelection } from '@/hooks/useTrackSelection';
+import { useUniversalSelection } from '@/hooks/useUniversalSelection';
 import SelectionToolbar from './SelectionToolbar';
 import { Track } from '@/types';
 
@@ -75,7 +75,7 @@ export const SelectionManager: React.FC<SelectionManagerProps> = ({
     externalIsSelectionMode,
     externalSelectedTracks,
 }) => {
-    const selection = useTrackSelection();
+    const selection = useUniversalSelection();
 
     const handleTrackPress = useCallback((track: Track, index: number) => {
         if (selection.isSelectionMode) {
@@ -99,6 +99,18 @@ export const SelectionManager: React.FC<SelectionManagerProps> = ({
 
     const handleSelectAll = useCallback(() => {
         selection.selectAll(tracks);
+    }, [selection, tracks]);
+
+    const handleDeselectAll = useCallback(() => {
+        selection.deselectAll();
+    }, [selection]);
+
+    const handleInvertSelection = useCallback(() => {
+        selection.invertSelection(tracks.map(t => t.id));
+    }, [selection, tracks]);
+
+    const handleSelectRange = useCallback(() => {
+        selection.selectRange(tracks.map(t => t.id));
     }, [selection, tracks]);
 
     const handleActionComplete = useCallback(() => {
@@ -137,7 +149,11 @@ export const SelectionManager: React.FC<SelectionManagerProps> = ({
                     totalCount={tracks.length}
                     onClose={selection.exitSelectionMode}
                     onSelectAll={handleSelectAll}
+                    onDeselectAll={handleDeselectAll}
+                    onInvertSelection={handleInvertSelection}
+                    onSelectRange={handleSelectRange}
                     getSelectedTracks={() => selection.getSelectedTracks(tracks)}
+                    getAllTrackIds={() => tracks.map(t => t.id)}
                     onActionComplete={handleActionComplete}
                 />
             )}

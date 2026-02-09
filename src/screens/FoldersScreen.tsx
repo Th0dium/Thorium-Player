@@ -15,7 +15,7 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useTheme } from '@/context/ThemeContext';
-import { useTrackSelection } from '@/hooks/useTrackSelection';
+import { useUniversalSelection } from '@/hooks/useUniversalSelection';
 import { Folder, Track } from '@/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import TrackListItem from '@/components/TrackListItem';
@@ -39,7 +39,7 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
     const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
 
     // Track selection state
-    const selection = useTrackSelection();
+    const selection = useUniversalSelection();
 
     // Extract only the selection state values we need to trigger re-renders
     const selectionState = useMemo(() => ({
