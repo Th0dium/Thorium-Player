@@ -3,7 +3,7 @@
  * Shows selection count and batch action buttons
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -16,7 +16,6 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
 import { useQueueStore } from '@/store/queueStore';
-import { useLibraryStore } from '@/store/libraryStore';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
 import { Track } from '@/types';
 import { spacing, typography } from '@/constants/theme';
@@ -30,8 +29,16 @@ interface SelectionToolbarProps {
     onClose: () => void;
     /** Callback to select all items */
     onSelectAll: () => void;
+    /** Callback to deselect all items */
+    onDeselectAll: () => void;
+    /** Callback to invert selection */
+    onInvertSelection: (trackIds: string[]) => void;
+    /** Callback to select range */
+    onSelectRange: (trackIds: string[]) => void;
     /** Get the currently selected tracks for batch actions */
     getSelectedTracks: () => Track[];
+    /** Get all track IDs for advanced selection operations */
+    getAllTrackIds?: () => string[];
     /** Called after a batch action completes to exit selection mode */
     onActionComplete: () => void;
     /** Optional callback for delete action - if not provided, toolbar won't show delete */
@@ -45,7 +52,11 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
     totalCount,
     onClose,
     onSelectAll,
+    onDeselectAll,
+    onInvertSelection,
+    onSelectRange,
     getSelectedTracks,
+    getAllTrackIds,
     onActionComplete,
     onDeleteTracks,
     onToggleFavorite,
@@ -53,28 +64,34 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
     const { colors } = useTheme();
     const addToQueue = useQueueStore(state => state.addToQueue);
     const [showPlaylistModal, setShowPlaylistModal] = useState(false);
-    const [showMoreMenu, setShowMoreMenu] = useState(false);
+    const [showBatchActionsMenu, setShowBatchActionsMenu] = useState(false);
+    const [showAdvancedSelectMenu, setShowAdvancedSelectMenu] = useState(false);
 
-    const isAllSelected = selectionCount === totalCount && totalCount > 0;
+    // Memoize selected tracks to avoid recalculating on every render
+    const selectedTracks = useMemo(() => getSelectedTracks(), [getSelectedTracks]);
 
-    const handleAddToQueue = async () => {
+    const handleAddToQueue = useCallback(async () => {
         const tracks = getSelectedTracks();
         if (tracks.length > 0) {
-            await addToQueue(tracks);
+            try {
+                await addToQueue(tracks);
+                onActionComplete();
+            } catch (error) {
+                Alert.alert('Error', 'Failed to add tracks to queue');
+            }
         }
-        onActionComplete();
-    };
+    }, [getSelectedTracks, addToQueue, onActionComplete]);
 
-    const handleAddToPlaylist = () => {
+    const handleAddToPlaylist = useCallback(() => {
         setShowPlaylistModal(true);
-    };
+    }, []);
 
-    const handleClosePlaylistModal = () => {
+    const handleClosePlaylistModal = useCallback(() => {
         setShowPlaylistModal(false);
         onActionComplete();
-    };
+    }, [onActionComplete]);
 
-    const handleDeleteTracks = async () => {
+    const handleDeleteTracks = useCallback(() => {
         const tracks = getSelectedTracks();
         if (tracks.length === 0) return;
 
@@ -92,7 +109,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                                 await onDeleteTracks(tracks);
                             }
                             onActionComplete();
-                            setShowMoreMenu(false);
+                            setShowBatchActionsMenu(false);
                         } catch (error) {
                             Alert.alert('Error', 'Failed to delete tracks');
                         }
@@ -100,71 +117,115 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                 },
             ]
         );
-    };
+    }, [getSelectedTracks, onDeleteTracks, onActionComplete]);
 
-    const handleToggleFavorite = async () => {
+    const handleToggleFavorite = useCallback(() => {
         const tracks = getSelectedTracks();
         if (tracks.length === 0) return;
 
         const allFavorited = tracks.every(t => t.isFavorite);
         try {
             if (onToggleFavorite) {
-                await onToggleFavorite(tracks, !allFavorited);
+                onToggleFavorite(tracks, !allFavorited).then(() => {
+                    onActionComplete();
+                    setShowBatchActionsMenu(false);
+                });
             }
-            onActionComplete();
-            setShowMoreMenu(false);
         } catch (error) {
             Alert.alert('Error', 'Failed to update favorites');
         }
-    };
-
-    // Get first selected track for AddToPlaylistModal (it handles the rest via trackIds)
-    const selectedTracks = getSelectedTracks();
+    }, [getSelectedTracks, onToggleFavorite, onActionComplete]);
 
     return (
         <>
-            {/* Floating Dynamic Island Toolbar */}
+            {/* Floating Dynamic Island Toolbar - Redesigned for balance and clarity */}
             <View style={styles.floatingContainer}>
-                <View style={[styles.dynamicIsland, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}>
-                    {/* Left: Count */}
-                    <Text style={[styles.count, { color: colors.textPrimary }]}>
-                        {selectionCount}
-                    </Text>
-
-                    {/* Center: Actions */}
-                    <View style={styles.actions}>
-                        {/* Add to Queue */}
-                        <TouchableOpacity
-                            onPress={handleAddToQueue}
-                            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                            disabled={selectionCount === 0}
-                        >
-                            <Icon name="plus-circle" size={20} color="#FFF" />
-                        </TouchableOpacity>
-
-                        {/* Add to Playlist */}
-                        <TouchableOpacity
-                            onPress={handleAddToPlaylist}
-                            style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                            disabled={selectionCount === 0}
-                        >
-                            <Icon name="playlist-plus" size={20} color="#FFF" />
-                        </TouchableOpacity>
-
-                        {/* More Actions */}
-                        <TouchableOpacity
-                            onPress={() => setShowMoreMenu(true)}
-                            style={[styles.actionButton, { backgroundColor: colors.backgroundTertiary }]}
-                            disabled={selectionCount === 0}
-                        >
-                            <Icon name="dots-horizontal" size={20} color={colors.textPrimary} />
-                        </TouchableOpacity>
+                <View
+                    style={[
+                        styles.dynamicIsland,
+                        { backgroundColor: colors.surface, shadowColor: colors.textPrimary }
+                    ]}
+                >
+                    {/* LEFT: Selection Count Badge */}
+                    <View style={[styles.countBadge, { backgroundColor: colors.primaryLight }]}>
+                        <Text style={[styles.countText, { color: colors.primary }]}>
+                            {selectionCount}
+                        </Text>
+                        <Text style={[styles.countLabel, { color: colors.textSecondary }]}>
+                            {selectionCount === 1 ? 'Item' : 'Items'}
+                        </Text>
                     </View>
 
-                    {/* Right: Close */}
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <Icon name="close-circle" size={24} color={colors.textSecondary} />
-                    </TouchableOpacity>
+                    {/* DIVIDER */}
+                    <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+                    {/* CENTER: Action Buttons - Select, Options, Cancel */}
+                    <View style={styles.actionsContainer}>
+                        {/* Advanced Select Button */}
+                        <TouchableOpacity
+                            onPress={() => setShowAdvancedSelectMenu(true)}
+                            style={styles.actionButtonWrapper}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            activeOpacity={0.6}
+                        >
+                            <View style={[styles.actionButton, { backgroundColor: colors.primary }]}>
+                                <Icon name="tune-vertical" size={18} color="#FFF" />
+                            </View>
+                            <Text style={[styles.actionLabel, { color: colors.textPrimary }]} numberOfLines={1}>
+                                Select
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Batch Actions Options Button */}
+                        <TouchableOpacity
+                            onPress={() => setShowBatchActionsMenu(true)}
+                            disabled={selectionCount === 0}
+                            style={styles.actionButtonWrapper}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            activeOpacity={0.6}
+                        >
+                            <View
+                                style={[
+                                    styles.actionButton,
+                                    {
+                                        backgroundColor: selectionCount > 0 ? colors.primary : colors.backgroundTertiary
+                                    }
+                                ]}
+                            >
+                                <Icon
+                                    name="dots-vertical"
+                                    size={18}
+                                    color={selectionCount > 0 ? '#FFF' : colors.textTertiary}
+                                />
+                            </View>
+                            <Text
+                                style={[
+                                    styles.actionLabel,
+                                    {
+                                        color: selectionCount > 0 ? colors.textPrimary : colors.textTertiary
+                                    }
+                                ]}
+                                numberOfLines={1}
+                            >
+                                Actions
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Cancel Button */}
+                        <TouchableOpacity
+                            onPress={onClose}
+                            style={styles.actionButtonWrapper}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            activeOpacity={0.6}
+                        >
+                            <View style={[styles.actionButton, { backgroundColor: colors.error }]}>
+                                <Icon name="close" size={18} color="#FFF" />
+                            </View>
+                            <Text style={[styles.actionLabel, { color: colors.error }]} numberOfLines={1}>
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
 
@@ -177,10 +238,10 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 
             {/* More Actions Menu Modal */}
             <Modal
-                visible={showMoreMenu}
+                visible={showBatchActionsMenu}
                 transparent
                 animationType="slide"
-                onRequestClose={() => setShowMoreMenu(false)}
+                onRequestClose={() => setShowBatchActionsMenu(false)}
             >
                 <View style={[styles.menuOverlay, { backgroundColor: colors.overlay }]}>
                     <View style={[styles.menuContent, { backgroundColor: colors.surface }]}>
@@ -190,7 +251,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                                 Actions
                             </Text>
                             <TouchableOpacity
-                                onPress={() => setShowMoreMenu(false)}
+                                onPress={() => setShowBatchActionsMenu(false)}
                                 style={styles.menuCloseButton}
                             >
                                 <Icon name="close" size={24} color={colors.textPrimary} />
@@ -199,11 +260,52 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 
                         {/* Menu Items */}
                         <ScrollView style={styles.menuItems}>
+                            {/* Add to Queue */}
+                            <TouchableOpacity
+                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                onPress={() => {
+                                    handleAddToQueue();
+                                    setShowBatchActionsMenu(false);
+                                }}
+                            >
+                                <Icon
+                                    name="plus-circle"
+                                    size={24}
+                                    color={colors.primary}
+                                    style={styles.menuItemIcon}
+                                />
+                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                    Add to Queue
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Add to Playlist */}
+                            <TouchableOpacity
+                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                onPress={() => {
+                                    handleAddToPlaylist();
+                                    setShowBatchActionsMenu(false);
+                                }}
+                            >
+                                <Icon
+                                    name="playlist-plus"
+                                    size={24}
+                                    color={colors.primary}
+                                    style={styles.menuItemIcon}
+                                />
+                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                    Add to Playlist
+                                </Text>
+                            </TouchableOpacity>
+
                             {/* Toggle Favorite */}
                             {onToggleFavorite && (
                                 <TouchableOpacity
                                     style={[styles.menuItem, { borderBottomColor: colors.border }]}
-                                    onPress={handleToggleFavorite}
+                                    onPress={() => {
+                                        handleToggleFavorite();
+                                        setShowBatchActionsMenu(false);
+                                    }}
                                 >
                                     <Icon
                                         name={selectedTracks.some(t => t.isFavorite) ? 'heart' : 'heart-outline'}
@@ -221,7 +323,10 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                             {onDeleteTracks && (
                                 <TouchableOpacity
                                     style={[styles.menuItem, { borderBottomColor: colors.border }]}
-                                    onPress={handleDeleteTracks}
+                                    onPress={() => {
+                                        handleDeleteTracks();
+                                        setShowBatchActionsMenu(false);
+                                    }}
                                 >
                                     <Icon
                                         name="delete-outline"
@@ -238,6 +343,114 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                     </View>
                 </View>
             </Modal>
+
+            {/* Advanced Selection Menu Modal */}
+            <Modal
+                visible={showAdvancedSelectMenu}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowAdvancedSelectMenu(false)}
+            >
+                <View style={[styles.menuOverlay, { backgroundColor: colors.overlay }]}>
+                    <View style={[styles.advancedMenuCard, { backgroundColor: colors.surface }]}>
+                        {/* Header */}
+                        <View style={styles.advancedMenuHeader}>
+                            <Text style={[styles.menuTitle, { color: colors.textPrimary }]}>
+                                Advanced Selection
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setShowAdvancedSelectMenu(false)}
+                                style={styles.menuCloseButton}
+                            >
+                                <Icon name="close" size={24} color={colors.textPrimary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Menu Items */}
+                        <ScrollView style={styles.advancedMenuItems}>
+                            {/* Select All */}
+                            <TouchableOpacity
+                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                onPress={() => {
+                                    onSelectAll();
+                                    setShowAdvancedSelectMenu(false);
+                                }}
+                            >
+                                <Icon
+                                    name="checkbox-multiple-marked"
+                                    size={24}
+                                    color={colors.primary}
+                                    style={styles.menuItemIcon}
+                                />
+                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                    Select All
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Deselect All */}
+                            <TouchableOpacity
+                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                onPress={() => {
+                                    onDeselectAll();
+                                    setShowAdvancedSelectMenu(false);
+                                }}
+                            >
+                                <Icon
+                                    name="checkbox-multiple-blank-outline"
+                                    size={24}
+                                    color={colors.primary}
+                                    style={styles.menuItemIcon}
+                                />
+                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                    Deselect All
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Invert Selection */}
+                            <TouchableOpacity
+                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                onPress={() => {
+                                    if (getAllTrackIds) {
+                                        onInvertSelection(getAllTrackIds());
+                                    }
+                                    setShowAdvancedSelectMenu(false);
+                                }}
+                            >
+                                <Icon
+                                    name="swap-horizontal"
+                                    size={24}
+                                    color={colors.primary}
+                                    style={styles.menuItemIcon}
+                                />
+                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                    Invert Selection
+                                </Text>
+                            </TouchableOpacity>
+
+                            {/* Select Range */}
+                            <TouchableOpacity
+                                style={styles.menuItem}
+                                onPress={() => {
+                                    if (getAllTrackIds) {
+                                        onSelectRange(getAllTrackIds());
+                                    }
+                                    setShowAdvancedSelectMenu(false);
+                                }}
+                            >
+                                <Icon
+                                    name="format-list-bulleted-square"
+                                    size={24}
+                                    color={colors.primary}
+                                    style={styles.menuItemIcon}
+                                />
+                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                    Select Range
+                                </Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </>
     );
 };
@@ -245,35 +458,62 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 const styles = StyleSheet.create({
     floatingContainer: {
         position: 'absolute',
-        bottom: 24,
-        left: 16,
-        right: 16,
+        bottom: 20,
+        left: 12,
+        right: 12,
         alignItems: 'center',
         pointerEvents: 'box-none',
+        zIndex: 999,
     },
     dynamicIsland: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.md,
+        paddingHorizontal: spacing.sm,
         paddingVertical: spacing.sm,
-        borderRadius: 28,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 12,
-        maxWidth: 400,
+        borderRadius: 24,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 15,
+        width: '100%',
+        maxWidth: 360,
     },
-    count: {
-        fontSize: typography.sizes.lg,
+    countBadge: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 50,
+    },
+    countText: {
+        fontSize: 16,
         fontWeight: '700',
-        marginRight: spacing.md,
-        minWidth: 32,
+        lineHeight: 20,
     },
-    actions: {
+    countLabel: {
+        fontSize: 10,
+        fontWeight: '500',
+        marginTop: 2,
+    },
+    divider: {
+        width: 1,
+        height: 32,
+        marginHorizontal: spacing.sm,
+        opacity: 0.3,
+    },
+    actionsContainer: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: spacing.sm,
-        flex: 1,
+        justifyContent: 'space-around',
+        paddingHorizontal: spacing.xs,
+    },
+    actionButtonWrapper: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: spacing.xs,
+        paddingVertical: spacing.xs,
     },
     actionButton: {
         width: 40,
@@ -281,9 +521,18 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
+        marginBottom: 4,
     },
-    closeButton: {
-        marginLeft: spacing.sm,
+    actionLabel: {
+        fontSize: 9,
+        fontWeight: '600',
+        textAlign: 'center',
+        minWidth: 40,
+    },
+    closeButtonWrapper: {
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        marginLeft: spacing.xs,
     },
     menuOverlay: {
         flex: 1,
@@ -311,6 +560,24 @@ const styles = StyleSheet.create({
     },
     menuItems: {
         paddingHorizontal: spacing.md,
+    },
+    advancedMenuHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
+    },
+    advancedMenuCard: {
+        borderRadius: 16,
+        maxHeight: '65%',
+        marginHorizontal: spacing.md,
+        overflow: 'hidden',
+    },
+    advancedMenuItems: {
+        paddingHorizontal: spacing.sm,
     },
     menuItem: {
         flexDirection: 'row',

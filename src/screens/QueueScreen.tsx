@@ -696,9 +696,16 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     totalCount={queueTracks.length}
                     onClose={selection.exitSelectionMode}
                     onSelectAll={() => selection.selectAll(queueTracks)}
+                    onDeselectAll={selection.deselectAll}
+                    onInvertSelection={handleInvertSelection}
+                    onSelectRange={handleSelectRange}
                     getSelectedTracks={() => selection.getSelectedTracks(queueTracks)}
+                    getAllTrackIds={() => queueTracks.map(t => t.id)}
                     onActionComplete={selection.exitSelectionMode}
                     onDeleteTracks={handleDeleteSelectedTracks}
+                    onToggleFavorite={async (tracks, isFavorite) => {
+                        // Implement if needed
+                    }}
                 />
             )}
         </GestureHandlerRootView>

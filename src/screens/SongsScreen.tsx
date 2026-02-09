@@ -258,7 +258,11 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
                     totalCount={filteredAndSortedTracks.length}
                     onClose={selection.exitSelectionMode}
                     onSelectAll={() => selection.selectAll(filteredAndSortedTracks)}
+                    onDeselectAll={selection.deselectAll}
+                    onInvertSelection={handleInvertSelection}
+                    onSelectRange={handleSelectRange}
                     getSelectedTracks={() => selection.getSelectedTracks(filteredAndSortedTracks)}
+                    getAllTrackIds={() => filteredAndSortedTracks.map(t => t.id)}
                     onActionComplete={selection.exitSelectionMode}
                 />
             )}

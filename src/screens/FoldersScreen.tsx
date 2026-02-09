@@ -332,7 +332,11 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                     totalCount={tracksInCurrentFolder.length}
                     onClose={selection.exitSelectionMode}
                     onSelectAll={() => selection.selectAll(tracksInCurrentFolder)}
+                    onDeselectAll={selection.deselectAll}
+                    onInvertSelection={handleInvertSelection}
+                    onSelectRange={handleSelectRange}
                     getSelectedTracks={() => selection.getSelectedTracks(tracksInCurrentFolder)}
+                    getAllTrackIds={() => tracksInCurrentFolder.map(t => t.id)}
                     onActionComplete={selection.exitSelectionMode}
                 />
             )}

@@ -1,7 +1,7 @@
 // Track List Item - Reusable track item component with consistent styling
 // Supports: Long press for multi-select, swipe actions, playback indicator
 // Performance: memo'd, minimal animated values, no entrance animation
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -55,6 +55,48 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
 }) => {
     const { colors } = useTheme();
 
+    // Memoize style calculations to prevent re-renders
+    const containerStyle = useMemo(() => {
+        const baseColor = isPlaying ? colors.primary + '20' : (isSelected ? colors.primary + '15' : colors.surface);
+        const borderColor = isSelected ? colors.primary : 'transparent';
+        const borderLeftColor = isPlaying ? colors.primary : 'transparent';
+        return { backgroundColor: baseColor, borderColor, borderLeftColor };
+    }, [isPlaying, isSelected, colors]);
+
+    const shadowOverlayStyle = useMemo(() => ({
+        backgroundColor: colors.background + 'CC'
+    }), [colors]);
+
+    const checkboxSelectedStyle = useMemo(() => ({
+        backgroundColor: colors.primary,
+        borderColor: colors.primary
+    }), [colors.primary]);
+
+    const indexTextStyle = useMemo(() => ({
+        color: isPast ? colors.textTertiary : colors.textSecondary
+    }), [isPast, colors.textTertiary, colors.textSecondary]);
+
+    const artworkPlaceholderStyle = useMemo(() => ({
+        backgroundColor: colors.backgroundTertiary
+    }), [colors.backgroundTertiary]);
+
+    const playingOverlayStyle = useMemo(() => ({
+        backgroundColor: colors.primary + '80'
+    }), [colors.primary]);
+
+    const titleStyle = useMemo(() => [
+        styles.title,
+        { color: colors.textPrimary },
+        isPlaying && { color: colors.primary },
+        isPast && { color: colors.textSecondary },
+    ], [isPlaying, isPast, colors]);
+
+    const subtitleStyle = useMemo(() => [
+        styles.subtitle,
+        { color: colors.textSecondary },
+        isPast && { color: colors.textTertiary }
+    ], [isPast, colors]);
+
     const handlePress = useCallback(() => {
         onPress(track, index);
     }, [track, index, onPress]);
@@ -76,9 +118,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
         <TouchableOpacity
             style={[
                 styles.container,
-                { backgroundColor: colors.surface },
-                isPlaying && [styles.containerPlaying, { backgroundColor: colors.primary + '15', borderLeftColor: colors.primary }],
-                isSelected && [styles.containerSelected, { backgroundColor: colors.primary + '25' }],
+                containerStyle,
                 isPast && styles.containerPast,
             ]}
             onPress={handlePress}
@@ -88,7 +128,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
         >
             {/* Shadow overlay for non-selected items in selection mode */}
             {showSelection && !isSelected && (
-                <View style={[styles.shadowOverlay, { backgroundColor: colors.background + 'CC' }]} pointerEvents="none" />
+                <View style={[styles.shadowOverlay, shadowOverlayStyle]} pointerEvents="none" />
             )}
 
             {/* Drag Handle OR Selection Checkbox (same position to preserve layout) */}
@@ -97,7 +137,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                     {showSelection ? (
                         <View style={[
                             styles.checkbox,
-                            isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                            isSelected && checkboxSelectedStyle
                         ]}>
                             {isSelected && <Icon name="check" size={16} color="#FFF" />}
                         </View>
@@ -118,7 +158,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                     {isPlaying ? (
                         <Icon name="volume-high" size={18} color={colors.primary} />
                     ) : (
-                        <Text style={[styles.indexText, { color: isPast ? colors.textTertiary : colors.textSecondary }]}>
+                        <Text style={[styles.indexText, indexTextStyle]}>
                             {index + 1}
                         </Text>
                     )}
@@ -131,14 +171,14 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                     {track.albumArt ? (
                         <Image source={{ uri: track.albumArt }} style={styles.artwork} />
                     ) : (
-                        <View style={[styles.artworkPlaceholder, { backgroundColor: colors.backgroundTertiary }]}>
+                        <View style={[styles.artworkPlaceholder, artworkPlaceholderStyle]}>
                             <Icon name="music-note" size={20} color={colors.textTertiary} />
                         </View>
                     )}
                     {isPlaying && (
                         <View style={[
                             styles.playingOverlay,
-                            { backgroundColor: colors.primary + '80' },
+                            playingOverlayStyle,
                         ]}>
                             <Icon name="play" size={16} color="#FFF" />
                         </View>
@@ -149,21 +189,12 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
             {/* Track Info */}
             <View style={styles.infoContainer}>
                 <Text
-                    style={[
-                        styles.title,
-                        { color: colors.textPrimary },
-                        isPlaying && { color: colors.primary },
-                        isPast && { color: colors.textSecondary },
-                    ]}
+                    style={titleStyle}
                     numberOfLines={1}
                 >
                     {track.title}
                 </Text>
-                <Text style={[
-                    styles.subtitle,
-                    { color: colors.textSecondary },
-                    isPast && { color: colors.textTertiary }
-                ]} numberOfLines={1}>
+                <Text style={subtitleStyle} numberOfLines={1}>
                     {track.artist}{track.album && track.album !== 'Unknown Album' ? ` • ${track.album}` : ''}{track.duration > 0 ? ` • ${formatDuration(track.duration)}` : ''}
                 </Text>
             </View>
@@ -222,12 +253,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         borderRadius: borderRadius.md,
         marginBottom: spacing.xs,
-    },
-    containerPlaying: {
-        borderLeftWidth: 3,
-    },
-    containerSelected: {
         borderWidth: 1,
+        borderLeftWidth: 3,
+        borderColor: 'transparent',
+        borderLeftColor: 'transparent',
     },
     containerPast: {
         opacity: 0.5,
