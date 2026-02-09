@@ -41,6 +41,12 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
     // Track selection state
     const selection = useTrackSelection();
 
+    // Extract only the selection state values we need to trigger re-renders
+    const selectionState = useMemo(() => ({
+        isSelectionMode: selection.isSelectionMode,
+        selectedTracks: selection.selectedTracks,
+    }), [selection.isSelectionMode, selection.selectedTracks]);
+
     const folders = useLibraryStore(state => state.folders);
     const tracks = useLibraryStore(state => state.tracks);
     const isScanning = useLibraryStore(state => state.isScanning);
@@ -137,10 +143,9 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
     }, [tracksInCurrentFolder, currentPath, createQueue, onPlay, selection]);
 
     const handleTrackLongPress = useCallback((track: Track) => {
+        // Only enter selection mode on long-press if NOT already in selection mode
         if (!selection.isSelectionMode) {
             selection.enterSelectionMode(track);
-        } else {
-            selection.toggleTrack(track.id);
         }
     }, [selection]);
 
@@ -192,7 +197,7 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
         }
     }, [tracksInCurrentFolder, currentPath, createQueue, onPlay]);
 
-    const renderItem = ({ item, index }: { item: FolderItem; index: number }) => {
+    const renderItem = useCallback(({ item, index }: { item: FolderItem; index: number }) => {
         if (item.type === 'folder') {
             const folder = item.data as Folder;
             return (
@@ -221,15 +226,15 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                 <TrackListItem
                     track={track}
                     isPlaying={currentTrack?.id === track.id && isPlaying}
-                    isSelected={selection.selectedTracks.has(track.id)}
-                    showSelection={selection.isSelectionMode}
+                    isSelected={selectionState.selectedTracks.has(track.id)}
+                    showSelection={selectionState.isSelectionMode}
                     onPress={() => handleTrackPress(track, index)}
                     onLongPress={() => handleTrackLongPress(track)}
                     onMorePress={handleMorePress}
                 />
             );
         }
-    };
+    }, [styles, colors, handleFolderPress, currentTrack, isPlaying, selectionState, handleTrackPress, handleTrackLongPress, handleMorePress]);
 
     const styles = useMemo(() => createStyles(colors), [colors]);
 

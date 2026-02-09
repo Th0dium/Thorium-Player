@@ -43,6 +43,13 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
     // Track selection state
     const selection = useTrackSelection();
 
+    // Extract only the selection state values we need to trigger re-renders
+    // when selection state changes
+    const selectionState = useMemo(() => ({
+        isSelectionMode: selection.isSelectionMode,
+        selectedTracks: selection.selectedTracks,
+    }), [selection.isSelectionMode, selection.selectedTracks]);
+
     // Use individual selectors to prevent re-renders when unrelated state changes
     const tracks = useLibraryStore(state => state.tracks);
     const isLoading = useLibraryStore(state => state.isLoading);
@@ -118,10 +125,9 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
     }, [filteredAndSortedTracks, selection, searchQuery, createQueue, onPlay, sortBy, sortAsc]);
 
     const handleTrackLongPress = useCallback((track: Track) => {
+        // Only enter selection mode on long-press if NOT already in selection mode
         if (!selection.isSelectionMode) {
             selection.enterSelectionMode(track);
-        } else {
-            selection.toggleTrack(track.id);
         }
     }, [selection]);
 
@@ -147,13 +153,13 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
             track={item}
             index={index}
             isPlaying={currentTrackId === item.id && isPlaying}
-            isSelected={selection.selectedTracks.has(item.id)}
-            showSelection={selection.isSelectionMode}
+            isSelected={selectionState.selectedTracks.has(item.id)}
+            showSelection={selectionState.isSelectionMode}
             onPress={() => handleTrackPress(item, index)}
             onLongPress={() => handleTrackLongPress(item)}
             onMorePress={handleMorePress}
         />
-    ), [currentTrackId, isPlaying, selection, handleTrackPress, handleTrackLongPress, handleMorePress]);
+    ), [currentTrackId, isPlaying, selectionState, handleTrackPress, handleTrackLongPress, handleMorePress]);
 
     const keyExtractor = useCallback((item: Track) => item.id, []);
 

@@ -63,7 +63,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
     onToggleFavorite,
 }) => {
     const { colors } = useTheme();
-    
+
     // Animation for dynamic island slide in/out
     const slideAnim = useRef(new Animated.Value(100)).current;
 
@@ -175,7 +175,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
     return (
         <>
             {/* Floating Dynamic Island Toolbar - Redesigned for balance and clarity */}
-            <Animated.View 
+            <Animated.View
                 style={[
                     styles.floatingContainer,
                     { transform: [{ translateY: slideAnim }] }
@@ -409,43 +409,44 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 
                         {/* Menu Items */}
                         <ScrollView style={styles.advancedMenuItems}>
-                            {/* Select All */}
-                            <TouchableOpacity
-                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
-                                onPress={() => {
-                                    onSelectAll();
-                                    setShowAdvancedSelectMenu(false);
-                                }}
-                            >
-                                <Icon
-                                    name="checkbox-multiple-marked"
-                                    size={24}
-                                    color={colors.primary}
-                                    style={styles.menuItemIcon}
-                                />
-                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
-                                    Select All
-                                </Text>
-                            </TouchableOpacity>
-
-                            {/* Deselect All */}
-                            <TouchableOpacity
-                                style={[styles.menuItem, { borderBottomColor: colors.border }]}
-                                onPress={() => {
-                                    onDeselectAll();
-                                    setShowAdvancedSelectMenu(false);
-                                }}
-                            >
-                                <Icon
-                                    name="checkbox-multiple-blank-outline"
-                                    size={24}
-                                    color={colors.primary}
-                                    style={styles.menuItemIcon}
-                                />
-                                <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
-                                    Deselect All
-                                </Text>
-                            </TouchableOpacity>
+                            {/* Select All / Deselect All (conditional based on selection state) */}
+                            {selectionCount < totalCount ? (
+                                <TouchableOpacity
+                                    style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                    onPress={() => {
+                                        onSelectAll();
+                                        setShowAdvancedSelectMenu(false);
+                                    }}
+                                >
+                                    <Icon
+                                        name="checkbox-multiple-marked"
+                                        size={24}
+                                        color={colors.primary}
+                                        style={styles.menuItemIcon}
+                                    />
+                                    <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                        Select All
+                                    </Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <TouchableOpacity
+                                    style={[styles.menuItem, { borderBottomColor: colors.border }]}
+                                    onPress={() => {
+                                        onDeselectAll();
+                                        setShowAdvancedSelectMenu(false);
+                                    }}
+                                >
+                                    <Icon
+                                        name="checkbox-multiple-blank-outline"
+                                        size={24}
+                                        color={colors.primary}
+                                        style={styles.menuItemIcon}
+                                    />
+                                    <Text style={[styles.menuItemText, { color: colors.textPrimary }]}>
+                                        Deselect All
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
 
                             {/* Invert Selection */}
                             <TouchableOpacity

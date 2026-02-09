@@ -139,13 +139,13 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
             delayLongPress={300}
         >
             {/* Shadow overlay for non-selected items in selection mode */}
-            <Animated.View 
+            <Animated.View
                 style={[
-                    styles.shadowOverlay, 
+                    styles.shadowOverlay,
                     shadowOverlayStyle,
                     { opacity: shadowOpacity }
-                ]} 
-                pointerEvents="none" 
+                ]}
+                pointerEvents="none"
             />
 
             {/* Drag Handle OR Selection Checkbox (same position to preserve layout) */}

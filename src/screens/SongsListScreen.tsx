@@ -74,6 +74,12 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
     // Track selection state
     const selection = useTrackSelection();
 
+    // Extract only the selection state values we need to trigger re-renders
+    const selectionState = useMemo(() => ({
+        isSelectionMode: selection.isSelectionMode,
+        selectedTracks: selection.selectedTracks,
+    }), [selection.isSelectionMode, selection.selectedTracks]);
+
     // Filter and sort tracks
     const filteredTracks = useMemo(() => {
         const now = Date.now();
@@ -163,7 +169,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
 
     const handleTrackPress = useCallback((track: Track, index: number) => {
         // If in selection mode, toggle selection instead of playing
-        if (selection.isSelectionMode) {
+        if (selectionState.isSelectionMode) {
             selection.toggleTrack(track.id);
             return;
         }
@@ -186,15 +192,14 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
             id: playlistId || albumId || artistId || genreId,
         }, index, sortBy, sortAsc);
         onPlay?.();
-    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay, sortBy, sortAsc, selection]);
+    }, [filteredTracks, createQueue, filter, title, playlistId, albumId, artistId, genreId, onPlay, sortBy, sortAsc, selectionState]);
 
     const handleTrackLongPress = useCallback((track: Track) => {
-        if (!selection.isSelectionMode) {
+        // Only enter selection mode on long-press if NOT already in selection mode
+        if (!selectionState.isSelectionMode) {
             selection.enterSelectionMode(track);
-        } else {
-            selection.toggleTrack(track.id);
         }
-    }, [selection]);
+    }, [selectionState.isSelectionMode, selection]);
 
     const handleInvertSelection = useCallback((trackIds: string[]) => {
         selection.invertSelection(trackIds);
@@ -213,8 +218,8 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         <TrackListItem
             track={item}
             isPlaying={currentTrackId === item.id}
-            isSelected={selection.selectedTracks.has(item.id)}
-            showSelection={selection.isSelectionMode}
+            isSelected={selectionState.selectedTracks.has(item.id)}
+            showSelection={selectionState.isSelectionMode}
             onPress={() => handleTrackPress(item, index)}
             onLongPress={() => handleTrackLongPress(item)}
             onMorePress={handleMorePress}
@@ -229,7 +234,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
                 </Text>
             ) : undefined}
         />
-    ), [currentTrackId, handleTrackPress, filter, sortBy, colors, typography, handleMorePress]);
+    ), [currentTrackId, handleTrackPress, handleTrackLongPress, filter, sortBy, colors, typography, handleMorePress, selectionState]);
 
     const keyExtractor = useCallback((item: Track) => item.id, []);
 

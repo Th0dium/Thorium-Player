@@ -72,7 +72,13 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     // Track selection state
     const selection = useTrackSelection();
 
-    // Selection more options menu
+    // Extract only the selection state values we need to avoid stale closure issues
+    // while still triggering re-renders when these specific values change
+    const selectionState = useMemo(() => ({
+        isSelectionMode: selection.isSelectionMode,
+        selectedTracks: selection.selectedTracks,
+    }), [selection.isSelectionMode, selection.selectedTracks]);
+
     const [showSelectionOptions, setShowSelectionOptions] = useState(false);
 
     // Drag effect delay tracking
@@ -311,7 +317,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
 
     const handleTrackPress = useCallback(async (filteredIndex: number) => {
         // If in selection mode, toggle selection instead of playing
-        if (selection.isSelectionMode) {
+        if (selectionState.isSelectionMode) {
             const track = filteredTracks[filteredIndex];
             if (track) {
                 selection.toggleTrack(track.id);
@@ -333,20 +339,18 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         await skipToIndex(realIndex);
         // Ensure playback starts (important if player was paused or on first play)
         await usePlayerStore.getState().play();
-    }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks, selection]);
+    }, [skipToIndex, isSearchActive, searchQuery, filteredTracks, queueTracks, selectionState, selection]);
 
     const handleTrackLongPress = useCallback((filteredIndex: number) => {
-        const track = filteredTracks[filteredIndex];
-        if (!track) return;
-
-        if (!selection.isSelectionMode) {
-            // Enter selection mode
-            selection.enterSelectionMode(track);
-        } else {
-            // Already in selection mode, toggle selection
-            selection.toggleTrack(track.id);
+        // Only enter selection mode on long-press if NOT already in selection mode
+        // When in selection mode, only tap toggles the selection
+        if (!selectionState.isSelectionMode) {
+            const track = filteredTracks[filteredIndex];
+            if (track) {
+                selection.enterSelectionMode(track);
+            }
         }
-    }, [filteredTracks, selection]);
+    }, [filteredTracks, selectionState, selection]);
 
     const handleDeleteSelectedTracks = useCallback(async (tracks: Track[]) => {
         // Delete tracks from queue by their IDs
@@ -386,7 +390,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         const isPlaying = realIndex === currentIndex;
         const isPast = realIndex < currentIndex;
         const isSearching = isSearchActive && !!searchQuery;
-        const isSelected = selection.selectedTracks.has(item.id);
+        const isSelected = selectionState.selectedTracks.has(item.id);
 
         // Only apply drag effect after delay to reduce rendering complexity
         const showDragEffect = isDragging && shouldShowDragEffect;
@@ -434,18 +438,18 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                     index={realIndex}
                     isPlaying={isPlaying}
                     isSelected={isSelected}
-                    showSelection={selection.isSelectionMode}
+                    showSelection={selectionState.isSelectionMode}
                     isPast={isPast}
                     showArtwork={true}
-                    showDragHandle={!isSearching && !selection.isSelectionMode}
-                    drag={isSearching || selection.isSelectionMode ? undefined : drag}
+                    showDragHandle={!isSearching && !selectionState.isSelectionMode}
+                    drag={isSearching || selectionState.isSelectionMode ? undefined : drag}
                     onPress={() => handleTrackPress(filteredIndex)}
                     onLongPress={() => handleTrackLongPress(filteredIndex)}
                     onMorePress={handleMorePress}
                 />
             </View>
         );
-    }, [currentIndex, handleTrackPress, handleTrackLongPress, handleMorePress, isSearchActive, searchQuery, queueTracks, selection, shouldShowDragEffect]);
+    }, [currentIndex, handleTrackPress, handleTrackLongPress, handleMorePress, isSearchActive, searchQuery, queueTracks, shouldShowDragEffect, selectionState]);
 
     // --- Render Queue Switcher Modal Item ---
     const renderQueueSwitcherItem = useCallback(({ item: meta }: { item: typeof queuesWithMetadata[0] }) => {
