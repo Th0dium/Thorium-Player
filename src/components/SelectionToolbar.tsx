@@ -123,66 +123,47 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 
     return (
         <>
-            <View style={[styles.container, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-                {/* Left: Close button + count */}
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                    <Icon name="close" size={24} color={colors.textPrimary} />
-                </TouchableOpacity>
-                <Text style={[styles.count, { color: colors.textPrimary }]}>
-                    {selectionCount} selected
-                </Text>
+            {/* Floating Dynamic Island Toolbar */}
+            <View style={styles.floatingContainer}>
+                <View style={[styles.dynamicIsland, { backgroundColor: colors.surface, shadowColor: colors.textPrimary }]}>
+                    {/* Left: Count */}
+                    <Text style={[styles.count, { color: colors.textPrimary }]}>
+                        {selectionCount}
+                    </Text>
 
-                {/* Right: Actions */}
-                <View style={styles.actions}>
-                    {/* Select All Toggle */}
-                    <TouchableOpacity
-                        onPress={isAllSelected ? onClose : onSelectAll}
-                        style={styles.actionButton}
-                    >
-                        <Icon
-                            name={isAllSelected ? 'checkbox-multiple-marked' : 'checkbox-multiple-blank-outline'}
-                            size={22}
-                            color={colors.textPrimary}
-                        />
-                    </TouchableOpacity>
+                    {/* Center: Actions */}
+                    <View style={styles.actions}>
+                        {/* Add to Queue */}
+                        <TouchableOpacity
+                            onPress={handleAddToQueue}
+                            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                            disabled={selectionCount === 0}
+                        >
+                            <Icon name="plus-circle" size={20} color="#FFF" />
+                        </TouchableOpacity>
 
-                    {/* Add to Playlist */}
-                    <TouchableOpacity
-                        onPress={handleAddToPlaylist}
-                        style={styles.actionButton}
-                        disabled={selectionCount === 0}
-                    >
-                        <Icon
-                            name="playlist-plus"
-                            size={22}
-                            color={selectionCount > 0 ? colors.primary : colors.textTertiary}
-                        />
-                    </TouchableOpacity>
+                        {/* Add to Playlist */}
+                        <TouchableOpacity
+                            onPress={handleAddToPlaylist}
+                            style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                            disabled={selectionCount === 0}
+                        >
+                            <Icon name="playlist-plus" size={20} color="#FFF" />
+                        </TouchableOpacity>
 
-                    {/* Add to Queue */}
-                    <TouchableOpacity
-                        onPress={handleAddToQueue}
-                        style={styles.actionButton}
-                        disabled={selectionCount === 0}
-                    >
-                        <Icon
-                            name="plus-circle-outline"
-                            size={22}
-                            color={selectionCount > 0 ? colors.primary : colors.textTertiary}
-                        />
-                    </TouchableOpacity>
+                        {/* More Actions */}
+                        <TouchableOpacity
+                            onPress={() => setShowMoreMenu(true)}
+                            style={[styles.actionButton, { backgroundColor: colors.backgroundTertiary }]}
+                            disabled={selectionCount === 0}
+                        >
+                            <Icon name="dots-horizontal" size={20} color={colors.textPrimary} />
+                        </TouchableOpacity>
+                    </View>
 
-                    {/* More Actions Menu */}
-                    <TouchableOpacity
-                        onPress={() => setShowMoreMenu(true)}
-                        style={styles.actionButton}
-                        disabled={selectionCount === 0}
-                    >
-                        <Icon
-                            name="dots-vertical"
-                            size={22}
-                            color={selectionCount > 0 ? colors.textSecondary : colors.textTertiary}
-                        />
+                    {/* Right: Close */}
+                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                        <Icon name="close-circle" size={24} color={colors.textSecondary} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -262,28 +243,47 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 };
 
 const styles = StyleSheet.create({
-    container: {
+    floatingContainer: {
+        position: 'absolute',
+        bottom: 24,
+        left: 16,
+        right: 16,
+        alignItems: 'center',
+        pointerEvents: 'box-none',
+    },
+    dynamicIsland: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: spacing.sm,
+        paddingHorizontal: spacing.md,
         paddingVertical: spacing.sm,
-        borderBottomWidth: 1,
-    },
-    closeButton: {
-        padding: spacing.sm,
+        borderRadius: 28,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 12,
+        maxWidth: 400,
     },
     count: {
-        flex: 1,
-        fontSize: typography.sizes.md,
-        fontWeight: '600',
-        marginLeft: spacing.xs,
+        fontSize: typography.sizes.lg,
+        fontWeight: '700',
+        marginRight: spacing.md,
+        minWidth: 32,
     },
     actions: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: spacing.sm,
+        flex: 1,
     },
     actionButton: {
-        padding: spacing.sm,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    closeButton: {
+        marginLeft: spacing.sm,
     },
     menuOverlay: {
         flex: 1,

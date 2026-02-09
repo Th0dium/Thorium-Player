@@ -23,6 +23,10 @@ export interface TrackSelectionState {
     selectAll: (tracks: Track[]) => void;
     /** Deselect all tracks (but stay in selection mode) */
     deselectAll: () => void;
+    /** Invert selection: select unselected, deselect selected */
+    invertSelection: (trackIds: string[]) => void;
+    /** Select specific range of tracks by ID */
+    selectRange: (trackIds: string[]) => void;
     /** Get selected tracks from a track list */
     getSelectedTracks: (allTracks: Track[]) => Track[];
     /** Get selected track IDs as array */
@@ -70,6 +74,29 @@ export function useTrackSelection(): TrackSelectionState {
         setIsSelectionMode(false);
     }, []);
 
+    const invertSelection = useCallback((trackIds: string[]) => {
+        setSelectedTracks(prev => {
+            const next = new Set<string>();
+            const currentSet = new Set(prev);
+
+            // For each track, if it was selected, deselect; if unselected, select
+            trackIds.forEach(id => {
+                if (currentSet.has(id)) {
+                    // Remove from selection
+                } else {
+                    // Add to selection
+                    next.add(id);
+                }
+            });
+
+            return next;
+        });
+    }, []);
+
+    const selectRange = useCallback((trackIds: string[]) => {
+        setSelectedTracks(new Set(trackIds));
+    }, []);
+
     const getSelectedTracks = useCallback((allTracks: Track[]) => {
         return allTracks.filter(t => selectedTracks.has(t.id));
     }, [selectedTracks]);
@@ -86,6 +113,8 @@ export function useTrackSelection(): TrackSelectionState {
         toggleTrack,
         selectAll,
         deselectAll,
+        invertSelection,
+        selectRange,
         getSelectedTracks,
         getSelectedIds,
         selectionCount: selectedTracks.size,

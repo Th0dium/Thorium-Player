@@ -86,15 +86,30 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
             activeOpacity={0.7}
             delayLongPress={300}
         >
-            {/* Drag Handle */}
-            {showDragHandle && (
-                <TouchableOpacity
-                    style={styles.dragHandle}
-                    onLongPress={drag}
-                    delayLongPress={0}
-                >
-                    <Icon name="drag-horizontal-variant" size={20} color={colors.textTertiary} />
-                </TouchableOpacity>
+            {/* Shadow overlay for non-selected items in selection mode */}
+            {showSelection && !isSelected && (
+                <View style={[styles.shadowOverlay, { backgroundColor: colors.background + 'CC' }]} pointerEvents="none" />
+            )}
+
+            {/* Drag Handle OR Selection Checkbox (same position to preserve layout) */}
+            {(showDragHandle || showSelection) && (
+                <View style={styles.dragHandle}>
+                    {showSelection ? (
+                        <View style={[
+                            styles.checkbox,
+                            isSelected && { backgroundColor: colors.primary, borderColor: colors.primary }
+                        ]}>
+                            {isSelected && <Icon name="check" size={16} color="#FFF" />}
+                        </View>
+                    ) : showDragHandle ? (
+                        <TouchableOpacity
+                            onLongPress={drag}
+                            delayLongPress={0}
+                        >
+                            <Icon name="drag-horizontal-variant" size={20} color={colors.textTertiary} />
+                        </TouchableOpacity>
+                    ) : null}
+                </View>
             )}
 
             {/* Index or Playing Indicator */}
@@ -153,14 +168,10 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                 </Text>
             </View>
 
-            {/* Right Element, Selection Indicator, Remove Button, or More Button */}
+            {/* Right Element, Remove Button, or More Button (selection check now at left) */}
             {rightElement ? (
                 <View style={styles.rightElementContainer}>
                     {rightElement}
-                </View>
-            ) : isSelected ? (
-                <View style={[styles.checkContainer, { backgroundColor: colors.primary }]}>
-                    <Icon name="check" size={16} color="#FFF" />
                 </View>
             ) : showRemoveButton ? (
                 <TouchableOpacity
@@ -170,7 +181,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
                 >
                     <Icon name="close" size={18} color={colors.textTertiary} />
                 </TouchableOpacity>
-            ) : onMorePress ? (
+            ) : !showSelection && onMorePress ? (
                 <TouchableOpacity
                     style={styles.moreButton}
                     onPress={handleMorePress}
@@ -190,6 +201,7 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
         prevProps.isPast === nextProps.isPast &&
         prevProps.index === nextProps.index &&
         prevProps.showDragHandle === nextProps.showDragHandle &&
+        prevProps.showSelection === nextProps.showSelection &&
         prevProps.showRemoveButton === nextProps.showRemoveButton &&
         prevProps.rightElement === nextProps.rightElement
     );
@@ -203,6 +215,7 @@ const formatDuration = (seconds: number): string => {
 
 const styles = StyleSheet.create({
     container: {
+        position: 'relative',
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: spacing.sm,
@@ -219,9 +232,29 @@ const styles = StyleSheet.create({
     containerPast: {
         opacity: 0.5,
     },
+    shadowOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        borderRadius: borderRadius.md,
+        zIndex: 1,
+    },
     dragHandle: {
-        paddingRight: spacing.sm,
-        paddingVertical: spacing.xs,
+        width: 32,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginRight: spacing.sm,
+    },
+    checkbox: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        borderWidth: 2,
+        borderColor: '#999',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     indexContainer: {
         width: 28,
@@ -269,13 +302,6 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: typography.sizes.sm,
         marginTop: 2,
-    },
-    checkContainer: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     removeButton: {
         padding: spacing.xs,

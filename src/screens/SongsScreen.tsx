@@ -129,6 +129,14 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
         await scanForMusic();
     }, [scanForMusic]);
 
+    const handleInvertSelection = useCallback((trackIds: string[]) => {
+        selection.invertSelection(trackIds);
+    }, [selection]);
+
+    const handleSelectRange = useCallback((trackIds: string[]) => {
+        selection.selectRange(trackIds);
+    }, [selection]);
+
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
         setShowTrackActions(true);
@@ -159,24 +167,22 @@ const SongsScreen: React.FC<SongsScreenProps> = ({ searchQuery = '', onPlay }) =
 
     return (
         <View style={styles.container}>
-            {/* Sort bar */}
-            {!selection.isSelectionMode && (
-                <View style={styles.sortBar}>
-                    <Text style={styles.trackCount}>{filteredAndSortedTracks.length} songs</Text>
-                    <TouchableOpacity
-                        style={styles.sortButton}
-                        onPress={() => setShowSortMenu(!showSortMenu)}
-                    >
-                        <Icon name="sort" size={20} color={colors.textSecondary} />
-                        <Text style={styles.sortLabel}>{sortBy}</Text>
-                        <Icon
-                            name={sortAsc ? 'arrow-up' : 'arrow-down'}
-                            size={16}
-                            color={colors.textSecondary}
-                        />
-                    </TouchableOpacity>
-                </View>
-            )}
+            {/* Sort bar - Always visible */}
+            <View style={styles.sortBar}>
+                <Text style={styles.trackCount}>{filteredAndSortedTracks.length} songs</Text>
+                <TouchableOpacity
+                    style={styles.sortButton}
+                    onPress={() => setShowSortMenu(!showSortMenu)}
+                >
+                    <Icon name="sort" size={20} color={colors.textSecondary} />
+                    <Text style={styles.sortLabel}>{sortBy}</Text>
+                    <Icon
+                        name={sortAsc ? 'arrow-up' : 'arrow-down'}
+                        size={16}
+                        color={colors.textSecondary}
+                    />
+                </TouchableOpacity>
+            </View>
 
             {/* Track list */}
             {isLoading && filteredAndSortedTracks.length === 0 ? (

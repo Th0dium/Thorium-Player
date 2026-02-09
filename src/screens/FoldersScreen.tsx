@@ -150,6 +150,14 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
         // For now, just close selection mode
     }, []);
 
+    const handleInvertSelection = useCallback((trackIds: string[]) => {
+        selection.invertSelection(trackIds);
+    }, [selection]);
+
+    const handleSelectRange = useCallback((trackIds: string[]) => {
+        selection.selectRange(trackIds);
+    }, [selection]);
+
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
         setShowTrackActions(true);
@@ -264,7 +272,7 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                 </View>
             )}
 
-            {/* Action bar */}
+            {/* Action bar - Always visible */}
             <View style={styles.actionBar}>
                 <Text style={styles.itemCount}>
                     {currentContents.filter(i => i.type === 'folder').length} folders • {tracksInCurrentFolder.length} songs
@@ -315,6 +323,7 @@ const FoldersScreen: React.FC<FoldersScreenProps> = ({ searchQuery = '', onPlay 
                 onClose={() => setShowTrackActions(false)}
                 onAddToQueue={(track) => addToQueue([track])}
             />
+
 
             {/* Selection Toolbar */}
             {selection.isSelectionMode && (

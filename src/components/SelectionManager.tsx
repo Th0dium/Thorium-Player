@@ -19,7 +19,7 @@ import { Track } from '@/types';
 interface SelectionManagerProps {
     /** Tracks displayed in the list */
     tracks: Track[];
-    
+
     /** Render function for track items
      * Receives: track, index, isSelected, onPress, onLongPress
      * Should return a single TrackListItem or custom component
@@ -31,31 +31,31 @@ interface SelectionManagerProps {
         onPress: () => void,
         onLongPress: () => void
     ) => React.ReactNode;
-    
+
     /** Callback when track is pressed in normal mode (play, navigate, etc.) */
     onTrackPress?: (track: Track, index: number) => void;
-    
+
     /** Called with selected tracks after batch action completes */
     onBatchActionComplete?: (selectedTracks: Track[]) => void;
-    
+
     /** List key extractor */
     keyExtractor?: (item: Track, index: number) => string;
-    
+
     /** Empty state component */
     ListEmptyComponent?: React.ComponentType<any> | null;
-    
+
     /** Additional FlatList props */
     flatListProps?: any;
-    
+
     /** Container style */
     containerStyle?: ViewStyle;
-    
+
     /** Show/hide the selection toolbar (for cases where parent manages it) */
     showToolbar?: boolean;
-    
+
     /** If true, passes selection state to parent instead of managing internally */
     externalManagement?: boolean;
-    
+
     /** Parent-managed selection state (when externalManagement=true) */
     externalIsSelectionMode?: boolean;
     externalSelectedTracks?: Set<string>;

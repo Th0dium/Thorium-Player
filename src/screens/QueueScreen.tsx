@@ -69,6 +69,9 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
     // Track selection state
     const selection = useTrackSelection();
 
+    // Selection more options menu
+    const [showSelectionOptions, setShowSelectionOptions] = useState(false);
+
     // Sync sorting state when queue changes
     useEffect(() => {
         if (currentQueue) {
@@ -338,6 +341,14 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         });
     }, [queueTracks]);
 
+    const handleInvertSelection = useCallback((trackIds: string[]) => {
+        selection.invertSelection(trackIds);
+    }, [selection]);
+
+    const handleSelectRange = useCallback((trackIds: string[]) => {
+        selection.selectRange(trackIds);
+    }, [selection]);
+
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
         setShowTrackActions(true);
@@ -488,7 +499,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
 
     return (
         <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Queue Header */}
+            {/* QUEUE HEADER - Always visible */}
             <View style={styles.header}>
                 <TouchableOpacity
                     style={[styles.queueSwitcherButton, { backgroundColor: colors.surface }]}

@@ -196,6 +196,14 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
         }
     }, [selection]);
 
+    const handleInvertSelection = useCallback((trackIds: string[]) => {
+        selection.invertSelection(trackIds);
+    }, [selection]);
+
+    const handleSelectRange = useCallback((trackIds: string[]) => {
+        selection.selectRange(trackIds);
+    }, [selection]);
+
     const handleMorePress = useCallback((track: Track) => {
         setSelectedTrack(track);
         setShowTrackActions(true);
@@ -245,7 +253,7 @@ const SongsListScreen: React.FC<SongsListScreenProps> = ({
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Header with back button */}
+            {/* Header with back button - Always visible */}
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity
                     style={styles.backButton}
