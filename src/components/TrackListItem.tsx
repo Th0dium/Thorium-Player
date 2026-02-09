@@ -1,13 +1,14 @@
 // Track List Item - Reusable track item component with consistent styling
 // Supports: Long press for multi-select, swipe actions, playback indicator
 // Performance: memo'd, minimal animated values, no entrance animation
-import React, { memo, useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     Image,
     StyleSheet,
+    Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Track } from '@/types';
@@ -54,6 +55,17 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
     rightElement,
 }) => {
     const { colors } = useTheme();
+
+    // Animation for shadow overlay fade in/out
+    const shadowOpacity = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.timing(shadowOpacity, {
+            toValue: showSelection && !isSelected ? 1 : 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start();
+    }, [showSelection, isSelected, shadowOpacity]);
 
     // Memoize style calculations to prevent re-renders
     const containerStyle = useMemo(() => {
@@ -127,9 +139,14 @@ const TrackListItem: React.FC<TrackListItemProps> = memo(({
             delayLongPress={300}
         >
             {/* Shadow overlay for non-selected items in selection mode */}
-            {showSelection && !isSelected && (
-                <View style={[styles.shadowOverlay, shadowOverlayStyle]} pointerEvents="none" />
-            )}
+            <Animated.View 
+                style={[
+                    styles.shadowOverlay, 
+                    shadowOverlayStyle,
+                    { opacity: shadowOpacity }
+                ]} 
+                pointerEvents="none" 
+            />
 
             {/* Drag Handle OR Selection Checkbox (same position to preserve layout) */}
             {(showDragHandle || showSelection) && (

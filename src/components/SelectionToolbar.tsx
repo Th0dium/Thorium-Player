@@ -3,7 +3,7 @@
  * Shows selection count and batch action buttons
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -12,6 +12,7 @@ import {
     Alert,
     Modal,
     ScrollView,
+    Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
@@ -62,6 +63,41 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
     onToggleFavorite,
 }) => {
     const { colors } = useTheme();
+    
+    // Animation for dynamic island slide in/out
+    const slideAnim = useRef(new Animated.Value(100)).current;
+
+    useEffect(() => {
+        Animated.spring(slideAnim, {
+            toValue: 0,
+            tension: 50,
+            friction: 8,
+            useNativeDriver: true,
+        }).start();
+    }, [slideAnim]);
+
+    // Handle close with exit animation
+    const handleClose = useCallback(() => {
+        Animated.timing(slideAnim, {
+            toValue: 100,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => {
+            onClose();
+        });
+    }, [slideAnim, onClose]);
+
+    // Handle action complete with exit animation
+    const handleActionComplete = useCallback(() => {
+        Animated.timing(slideAnim, {
+            toValue: 100,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => {
+            onActionComplete();
+        });
+    }, [slideAnim, onActionComplete]);
+
     const addToQueue = useQueueStore(state => state.addToQueue);
     const [showPlaylistModal, setShowPlaylistModal] = useState(false);
     const [showBatchActionsMenu, setShowBatchActionsMenu] = useState(false);
@@ -75,12 +111,12 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
         if (tracks.length > 0) {
             try {
                 await addToQueue(tracks);
-                onActionComplete();
+                handleActionComplete();
             } catch (error) {
                 Alert.alert('Error', 'Failed to add tracks to queue');
             }
         }
-    }, [getSelectedTracks, addToQueue, onActionComplete]);
+    }, [getSelectedTracks, addToQueue, handleActionComplete]);
 
     const handleAddToPlaylist = useCallback(() => {
         setShowPlaylistModal(true);
@@ -88,8 +124,8 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 
     const handleClosePlaylistModal = useCallback(() => {
         setShowPlaylistModal(false);
-        onActionComplete();
-    }, [onActionComplete]);
+        handleActionComplete();
+    }, [handleActionComplete]);
 
     const handleDeleteTracks = useCallback(() => {
         const tracks = getSelectedTracks();
@@ -108,7 +144,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                             if (onDeleteTracks) {
                                 await onDeleteTracks(tracks);
                             }
-                            onActionComplete();
+                            handleActionComplete();
                             setShowBatchActionsMenu(false);
                         } catch (error) {
                             Alert.alert('Error', 'Failed to delete tracks');
@@ -127,19 +163,24 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
         try {
             if (onToggleFavorite) {
                 onToggleFavorite(tracks, !allFavorited).then(() => {
-                    onActionComplete();
+                    handleActionComplete();
                     setShowBatchActionsMenu(false);
                 });
             }
         } catch (error) {
             Alert.alert('Error', 'Failed to update favorites');
         }
-    }, [getSelectedTracks, onToggleFavorite, onActionComplete]);
+    }, [getSelectedTracks, onToggleFavorite, handleActionComplete]);
 
     return (
         <>
             {/* Floating Dynamic Island Toolbar - Redesigned for balance and clarity */}
-            <View style={styles.floatingContainer}>
+            <Animated.View 
+                style={[
+                    styles.floatingContainer,
+                    { transform: [{ translateY: slideAnim }] }
+                ]}
+            >
                 <View
                     style={[
                         styles.dynamicIsland,
@@ -213,7 +254,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
 
                         {/* Cancel Button */}
                         <TouchableOpacity
-                            onPress={onClose}
+                            onPress={handleClose}
                             style={styles.actionButtonWrapper}
                             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             activeOpacity={0.6}
@@ -227,7 +268,7 @@ const SelectionToolbar: React.FC<SelectionToolbarProps> = ({
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
+            </Animated.View>
 
             {/* Add to Playlist Modal (batch mode) */}
             <AddToPlaylistModal

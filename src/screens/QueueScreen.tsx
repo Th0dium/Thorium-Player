@@ -33,6 +33,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
+// Delay before showing drag effect (in ms) to reduce rendering complexity
+const DRAG_EFFECT_DELAY = 800;
+
 interface QueueScreenProps {
     searchQuery?: string;
     isSearchActive?: boolean;
@@ -71,6 +74,11 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
 
     // Selection more options menu
     const [showSelectionOptions, setShowSelectionOptions] = useState(false);
+
+    // Drag effect delay tracking
+    const dragStartTimeRef = useRef<number | null>(null);
+    const [shouldShowDragEffect, setShouldShowDragEffect] = useState(false);
+    const dragEffectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Sync sorting state when queue changes
     useEffect(() => {
@@ -138,6 +146,16 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
             scrollToCurrentTrack();
         }
     }, [isFocused, currentQueue?.id, currentIndex, scrollToCurrentTrack]);
+
+    // Cleanup drag effect timer on unmount
+    useEffect(() => {
+        return () => {
+            if (dragEffectTimerRef.current) {
+                clearTimeout(dragEffectTimerRef.current);
+                dragEffectTimerRef.current = null;
+            }
+        };
+    }, []);
 
     const handleSwitchQueue = useCallback((index: number) => {
         switchQueue(index);
@@ -370,9 +388,29 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
         const isSearching = isSearchActive && !!searchQuery;
         const isSelected = selection.selectedTracks.has(item.id);
 
+        // Only apply drag effect after delay to reduce rendering complexity
+        const showDragEffect = isDragging && shouldShowDragEffect;
+
+        // Trigger drag effect timer when drag starts
+        if (isDragging && !dragStartTimeRef.current) {
+            dragStartTimeRef.current = Date.now();
+            if (dragEffectTimerRef.current) clearTimeout(dragEffectTimerRef.current);
+            dragEffectTimerRef.current = setTimeout(() => {
+                setShouldShowDragEffect(true);
+            }, DRAG_EFFECT_DELAY);
+        } else if (!isDragging && dragStartTimeRef.current) {
+            // Reset when drag ends
+            dragStartTimeRef.current = null;
+            setShouldShowDragEffect(false);
+            if (dragEffectTimerRef.current) {
+                clearTimeout(dragEffectTimerRef.current);
+                dragEffectTimerRef.current = null;
+            }
+        }
+
         return (
             <View
-                style={isDragging ? {
+                style={showDragEffect ? {
                     elevation: 8,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 4 },
@@ -407,7 +445,7 @@ const QueueScreen: React.FC<QueueScreenProps> = ({ searchQuery = '', isSearchAct
                 />
             </View>
         );
-    }, [currentIndex, handleTrackPress, handleTrackLongPress, handleMorePress, isSearchActive, searchQuery, queueTracks, selection]);
+    }, [currentIndex, handleTrackPress, handleTrackLongPress, handleMorePress, isSearchActive, searchQuery, queueTracks, selection, shouldShowDragEffect]);
 
     // --- Render Queue Switcher Modal Item ---
     const renderQueueSwitcherItem = useCallback(({ item: meta }: { item: typeof queuesWithMetadata[0] }) => {
