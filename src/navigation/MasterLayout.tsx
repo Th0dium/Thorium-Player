@@ -276,6 +276,8 @@ const MasterLayout: React.FC = () => {
                 case 'nowPlaying': content = <NowPlayingScreen />; break;
                 case 'library': content = <LibraryScreen {...screenProps} onNavigate={handleLibraryNavigate} />; break;
                 case 'folders': content = <FoldersScreen {...screenProps} />; break;
+                case 'albums': content = <AlbumsScreen {...screenProps} onAlbumPress={(a) => handleLibraryNavigate(`album-${a.id}`, { title: a.name })} />; break;
+                case 'artists': content = <ArtistsScreen {...screenProps} onArtistPress={(a) => handleLibraryNavigate(`artist-${a.id}`, { title: a.name })} />; break;
                 case 'playlists': content = <PlaylistsScreen {...screenProps} onPlaylistPress={(p) => handleLibraryNavigate(`playlist-${p.id}`, { title: p.name })} />; break;
                 case 'genres': content = <GenresScreen {...screenProps} onGenrePress={(g) => handleLibraryNavigate(`genre-${g.id}`, { title: g.name })} />; break;
                 case 'songs': content = <SongsScreen {...screenProps} />; break;
