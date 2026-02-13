@@ -21,45 +21,35 @@ import { colors, typography } from '@/constants/theme';
 const App: React.FC = () => {
     // This declares a functional component named 'App'. 'React.FC' is a TypeScript type for functional components.
     // The arrow function '() => {}' defines the component's body, which will return JSX (the UI).
-
     const [isInitializing, setIsInitializing] = useState(true);
     // 'useState' is a React hook that creates state. It returns [currentValue, setterFunction].
     // 'isInitializing' starts as 'true' (boolean). 'setIsInitializing' changes it later.
     // This tracks if the app is still loading.
-
     const [initError, setInitError] = useState<string | null>(null);
     // Another useState for error messages. Type is 'string | null' (string or nothing).
     // Starts as 'null', meaning no error yet.
 
     const [showOnboarding, setShowOnboarding] = useState(false);
     // Boolean state for whether to show the onboarding screen. Starts false.
-
     const [onboardingChecked, setOnboardingChecked] = useState(false);
     // Tracks if we've checked onboarding status. Starts false.
-
     const initializePlayer = usePlayerStore(state => state.initialize);
     // 'usePlayerStore' is a Zustand hook for global state. It selects 'initialize' function from the store.
     // This is for setting up the audio player.
-
     const loadLibrary = useLibraryStore(state => state.loadLibrary);
     // Selects 'loadLibrary' from the library store to load music data.
-
     const loadQueues = useQueueStore(state => state.loadQueues);
     // Selects 'loadQueues' to load playback queues.
-
     const loadSettings = useSettingsStore(state => state.loadSettings);
     // Selects 'loadSettings' to load user settings.
-
     const { autoScanOnStartup } = useSettingsStore();
     // Destructures 'autoScanOnStartup' from settings store. This is a value, not a function.
-
     useEffect(() => {
         // 'useEffect' is a hook that runs side effects. The function inside runs when the component mounts.
         // Empty dependency array '[]' means it runs only once, like componentDidMount in class components.
         checkOnboarding();
         // Calls the 'checkOnboarding' function to see if user has completed setup.
     }, []);
-
     const checkOnboarding = async () => {
         // 'const' declares a constant function. 'async' means it can use 'await' for promises (async operations).
         // This function checks if the user has finished the onboarding process.
@@ -94,7 +84,6 @@ const App: React.FC = () => {
             // Fallback: show onboarding and stop loading.
         }
     };
-
     const handleOnboardingComplete = () => {
         // This function runs when onboarding finishes. It's passed to the OnboardingNavigator.
         setShowOnboarding(false);
@@ -104,14 +93,12 @@ const App: React.FC = () => {
         initializeApp();
         // Calls the main app setup function.
     };
-
     const initializeApp = async () => {
         // 'async' function for asynchronous operations. Uses 'await' to wait for promises.
         try {
             // 'try' for error handling.
             console.log('[App] Starting initialization...');
             // Logs a message for debugging.
-
             // Request notification permission FIRST (Android 13+/API 33+)
             // Must happen before TrackPlayer.setupPlayer() so the foreground service
             // notification is allowed to display from the very first playback
