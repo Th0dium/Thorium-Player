@@ -32,5 +32,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true
-  }
+  },
+  "exclude": [
+    "playground",
+    "playground/**"
+  ]
 }

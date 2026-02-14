@@ -6,5 +6,20 @@
         },
         "npm search": true,
         "npm install": true
+    },
+    "files.exclude": {
+        "**/playground": true,
+        "**/playground/**": true
+    },
+    "search.exclude": {
+        "**/playground": true,
+        "**/playground/**": true
+    },
+    "files.watcherExclude": {
+        "**/playground/**": true
+    },
+    "problems.exclude": {
+        "**/logic-structures-playground/**": true,
+        "**/logic-structures-playground": true
     }
 }

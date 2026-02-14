@@ -1,0 +1,3 @@
+# Ignore playground examples and learning files
+playground/
+playground/**

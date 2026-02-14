@@ -28,11 +28,11 @@ const App: React.FC = () => {
     const [initError, setInitError] = useState<string | null>(null);
     // Another useState for error messages. Type is 'string | null' (string or nothing).
     // Starts as 'null', meaning no error yet.
-
     const [showOnboarding, setShowOnboarding] = useState(false);
     // Boolean state for whether to show the onboarding screen. Starts false.
     const [onboardingChecked, setOnboardingChecked] = useState(false);
     // Tracks if we've checked onboarding status. Starts false.
+
     const initializePlayer = usePlayerStore(state => state.initialize);
     // 'usePlayerStore' is a Zustand hook for global state. It selects 'initialize' function from the store.
     // This is for setting up the audio player.
@@ -45,7 +45,6 @@ const App: React.FC = () => {
     const { autoScanOnStartup } = useSettingsStore();
     // Destructures 'autoScanOnStartup' from settings store. This is a value, not a function.
     useEffect(() => {
-        // 'useEffect' is a hook that runs side effects. The function inside runs when the component mounts.
         // Empty dependency array '[]' means it runs only once, like componentDidMount in class components.
         checkOnboarding();
         // Calls the 'checkOnboarding' function to see if user has completed setup.
@@ -54,7 +53,6 @@ const App: React.FC = () => {
         // 'const' declares a constant function. 'async' means it can use 'await' for promises (async operations).
         // This function checks if the user has finished the onboarding process.
         try {
-            // 'try' block for error handling. Code inside runs, and 'catch' handles errors.
             const onboardingComplete = await checkOnboardingComplete();
             // 'await' waits for the promise to resolve. 'checkOnboardingComplete' returns true/false.
             console.log('[App] Onboarding complete:', onboardingComplete);
