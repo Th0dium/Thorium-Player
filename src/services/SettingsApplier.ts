@@ -39,39 +39,6 @@ class SettingsApplier {
     }
 
     /**
-     * Handle individual setting changes at runtime
-     */
-    async onSettingChange(key: string, value: any): Promise<void> {
-        try {
-            switch (key) {
-                case 'showTrackNotification':
-                    await this.applyNotifications(value);
-                    break;
-                case 'theme':
-                case 'accentColor':
-                    const { theme } = useSettingsStore.getState();
-                    await this.applyTheme(theme);
-                    break;
-                case 'gaplessPlayback':
-                    await this.applyGaplessPlayback(value);
-                    break;
-                case 'reducedAnimations':
-                    // Already reactive via UI components
-                    if (__DEV__) {
-                        console.log('[SettingsApplier] Reduced animations:', value);
-                    }
-                    break;
-                default:
-                    if (__DEV__) {
-                        console.log('[SettingsApplier] Setting not handled:', key);
-                    }
-            }
-        } catch (error) {
-            console.warn(`[SettingsApplier] Error applying setting "${key}":`, error);
-        }
-    }
-
-    /**
      * Apply notification visibility/capabilities based on user preference
      */
     async applyShowTrackNotification(showNotifications: boolean): Promise<void> {
