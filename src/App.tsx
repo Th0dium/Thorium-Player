@@ -17,6 +17,7 @@ import { audioService } from '@/services/AudioService';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ToastProvider } from '@/components/Toast';
 import { colors, typography } from '@/constants/theme';
+import { settingsApplier } from '@/services/SettingsApplier';
 
 const App: React.FC = () => {
     const [isInitializing, setIsInitializing] = useState(true);
@@ -30,9 +31,40 @@ const App: React.FC = () => {
     const loadSettings = useSettingsStore(state => state.loadSettings);
     const { autoScanOnStartup } = useSettingsStore();
 
+    // Subscribe to individual settings for runtime application
+    const showTrackNotification = useSettingsStore(state => state.showTrackNotification);
+    const theme = useSettingsStore(state => state.theme);
+    const gaplessPlayback = useSettingsStore(state => state.gaplessPlayback);
+    const reducedAnimations = useSettingsStore(state => state.reducedAnimations);
+
     useEffect(() => {
         checkOnboarding();
     }, []);
+
+    // Apply settings changes at runtime
+    useEffect(() => {
+        settingsApplier.applyShowTrackNotification(showTrackNotification).catch(e =>
+            console.warn('[App] Error applying showTrackNotification:', e)
+        );
+    }, [showTrackNotification]);
+
+    useEffect(() => {
+        settingsApplier.applyThemeChange(theme).catch(e =>
+            console.warn('[App] Error applying theme:', e)
+        );
+    }, [theme]);
+
+    useEffect(() => {
+        settingsApplier.applyGaplessPlaybackChange(gaplessPlayback).catch(e =>
+            console.warn('[App] Error applying gaplessPlayback:', e)
+        );
+    }, [gaplessPlayback]);
+
+    useEffect(() => {
+        settingsApplier.applyReducedAnimationsChange(reducedAnimations).catch(e =>
+            console.warn('[App] Error applying reducedAnimations:', e)
+        );
+    }, [reducedAnimations]);
 
     const checkOnboarding = async () => {
         try {
@@ -102,6 +134,11 @@ const App: React.FC = () => {
             const settings = await databaseService.getSettings();
             console.log('[App] App settings loaded');
 
+            // Apply all settings to runtime systems (notifications, theme, accessibility)
+            console.log('[App] Applying runtime settings...');
+            await settingsApplier.initialize();
+            console.log('[App] Runtime settings applied');
+
             if (settings.aiApiKey) {
                 console.log('[App] Configuring AI services...');
                 aiTagService.configure(settings.aiApiKey, settings.aiProvider);
@@ -120,12 +157,7 @@ const App: React.FC = () => {
                 useLibraryStore.getState().scanForMusic(settings.scanFolders);
             }
 
-            // Apply gapless playback setting
-            if (uiSettings.gaplessPlayback) {
-                console.log('[App] Gapless playback enabled');
-                // Note: react-native-track-player handles gapless by default
-                // Additional configuration would go here for custom implementations
-            }
+            // Gapless playback is now applied via SettingsApplier.initialize()
 
             // Start audio focus service for headphone/Bluetooth handling
             console.log('[App] Starting audio focus service...');
