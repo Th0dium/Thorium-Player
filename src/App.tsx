@@ -96,10 +96,8 @@ const App: React.FC = () => {
         try {
             // 'try' for error handling.
             console.log('[App] Starting initialization...');
-            // Logs a message for debugging.
             // Request notification permission FIRST (Android 13+/API 33+)
             // Must happen before TrackPlayer.setupPlayer() so the foreground service
-            // notification is allowed to display from the very first playback
             if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
                 // 'if' checks platform and version. 'Platform.OS' is 'android' or 'ios'.
                 console.log('[App] Requesting notification permission...');
@@ -118,31 +116,24 @@ const App: React.FC = () => {
                 // Logs the result.
             }
 
-            // Initialize database
             console.log('[App] Initializing database...');
             await databaseService.initialize();
-            // Calls service method asynchronously.
             console.log('[App] Database initialized');
 
-            // Load UI settings from settingsStore
             console.log('[App] Loading UI settings...');
             await loadSettings();
             console.log('[App] UI settings loaded');
 
-            // Initialize audio player
             console.log('[App] Initializing audio player...');
             await initializePlayer();
-            // Calls the store function.
             console.log('[App] Audio player initialized');
 
-            // Load settings and configure AI services
             console.log('[App] Loading app settings...');
             const settings = await databaseService.getSettings();
-            // 'const' declares a variable. 'await' gets settings from database.
             console.log('[App] App settings loaded');
 
             if (settings.aiApiKey) {
-                // 'if' checks if AI key exists.
+                // Checks if AI key exists.
                 console.log('[App] Configuring AI services...');
                 aiTagService.configure(settings.aiApiKey, settings.aiProvider);
                 // Calls configure method on service.
@@ -168,7 +159,7 @@ const App: React.FC = () => {
             if (uiSettings.gaplessPlayback) {
                 console.log('[App] Gapless playback enabled');
                 // Note: react-native-track-player handles gapless by default
-                // Additional configuration would go here for custom implementations
+                // This is a placeholder to show where gapless playback settings would be applied if needed.
             }
 
             // Start audio focus service for headphone/Bluetooth handling
