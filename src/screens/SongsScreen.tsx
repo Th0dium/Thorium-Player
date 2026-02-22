@@ -24,7 +24,7 @@ import SortMenu from '@/components/SortMenu';
 import { useSort } from '@/hooks/useSort';
 import { useUniversalSelection } from '@/hooks/useUniversalSelection';
 import { useTheme } from '@/context/ThemeContext';
-import { Track, SortOption } from '@/types';
+import { Track, SortOption } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 interface SongsScreenProps {

@@ -11,7 +11,7 @@ import {
     Animated,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 import { useTheme } from '@/context/ThemeContext';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 

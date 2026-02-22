@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
-import { Album } from '@/types';
+import { Album } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

@@ -1,5 +1,5 @@
 // AI Tag Service - Generates semantic tags for tracks using AI
-import { Track, AITag, AITagCategory, AITagRequest, AITagResponse } from '@/types';
+import { Track, AITag, AITagCategory, AITagRequest, AITagResponse } from '@/store/types';
 import { databaseService } from './DatabaseService';
 
 // Predefined tag colors by category

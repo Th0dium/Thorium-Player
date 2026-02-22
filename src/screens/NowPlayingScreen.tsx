@@ -22,7 +22,7 @@ import { useTheme } from '@/context/ThemeContext';
 import PlayerControls from '@/components/PlayerControls';
 import ProgressBar from '@/components/ProgressBar';
 import { spacing, typography, borderRadius } from '@/constants/theme';
-import { ABRepeatState } from '@/types';
+import { ABRepeatState } from '@/store/types';
 import SleepTimerModal from '@/components/SleepTimerModal';
 import { useSleepTimerStore } from '@/services/SleepTimerService';
 

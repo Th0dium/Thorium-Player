@@ -1,6 +1,6 @@
 // Player Store - Global state for audio playback using Zustand
 import { create } from 'zustand';
-import { Track, RepeatMode, ShuffleMode, PlayerState, ABRepeatState } from '@/types';
+import { Track, RepeatMode, ShuffleMode, PlayerState, ABRepeatState } from '@/store/types';
 import { audioService } from '@/services/AudioService';
 import { databaseService } from '@/services/DatabaseService';
 import { playbackTracker } from '@/services/PlaybackTracker';

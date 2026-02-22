@@ -13,7 +13,7 @@ import {
     Playlist,
     Queue,
     Settings,
-} from '@/types';
+} from '@/store/types';
 import { databaseService } from './DatabaseService';
 import { fileSystemService } from './FileSystemService';
 import { Platform } from 'react-native';

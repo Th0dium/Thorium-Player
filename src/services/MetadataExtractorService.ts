@@ -7,7 +7,7 @@
 // - Consider removing extractMetadata/extractFromFile methods in future cleanup
 //
 import RNFS from 'react-native-fs';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 
 // Import MusicFiles with defensive check - native module may not be available
 let MusicFiles: any = null;

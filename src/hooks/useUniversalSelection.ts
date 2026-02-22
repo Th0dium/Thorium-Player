@@ -7,7 +7,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useSelectionStore } from '@/store/selectionStore';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 
 export interface UniversalSelectionState {
     /** Currently selected track IDs (global across all screens) */
@@ -40,7 +40,7 @@ export function useUniversalSelection(): UniversalSelectionState {
     const selectedTracks = useSelectionStore(state => state.selectedTrackIds);
     const isSelectionMode = useSelectionStore(state => state.isSelectionMode);
     const selectionCount = useSelectionStore(state => state.selectionCount);
-    
+
     // Selection methods (from store)
     const enterSelectionMode = useSelectionStore(state => state.enterSelectionMode);
     const exitSelectionMode = useSelectionStore(state => state.exitSelectionMode);

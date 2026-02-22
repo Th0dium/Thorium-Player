@@ -1,6 +1,6 @@
 // Library Profiling Service - Extracts metadata for music library
 // Per-file extraction using native MediaMetadataRetriever
-import { Track as AppTrack } from '@/types';
+import { Track as AppTrack } from '@/store/types';
 import { metadataExtractorService, AudioMetadata } from './MetadataExtractorService';
 import { databaseService } from './DatabaseService';
 import { NativeModules, Platform } from 'react-native';

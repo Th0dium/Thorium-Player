@@ -1,6 +1,6 @@
 // Queue Store - Manages multiple playback queues (dynamic)
 import { create } from 'zustand';
-import { Queue, Track, QueueSource, SortOption } from '@/types';
+import { Queue, Track, QueueSource, SortOption } from '@/store/types';
 import { databaseService } from '@/services/DatabaseService';
 import { audioService } from '@/services/AudioService';
 import { usePlayerStore } from './playerStore';
@@ -450,9 +450,9 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
         const newCurrentIndex = newTrackIds.indexOf(currentTrackId);
 
         // Update local state
-        const updatedQueue: Queue = { 
-            ...currentQueue, 
-            trackIds: newTrackIds, 
+        const updatedQueue: Queue = {
+            ...currentQueue,
+            trackIds: newTrackIds,
             currentIndex: newCurrentIndex,
             sortBy,
             sortAsc
@@ -461,7 +461,7 @@ export const useQueueStore = create<QueueStore>((set, get) => ({
 
         // Update audio service queue
         await audioService.setQueue(queueTracks);
-        
+
         // Restore position
         if (newCurrentIndex !== -1) {
             await audioService.skipToTrack(newCurrentIndex);

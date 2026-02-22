@@ -18,7 +18,7 @@ import DocumentPicker from 'react-native-document-picker';
 import Share from 'react-native-share';
 import { useTheme } from '@/context/ThemeContext';
 import { backupService } from '@/services/BackupService';
-import { BackupMetadata } from '@/types';
+import { BackupMetadata } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 interface BackupItem {

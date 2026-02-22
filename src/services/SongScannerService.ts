@@ -10,7 +10,7 @@
 //
 import RNFS from 'react-native-fs';
 import TrackPlayer, { Track } from 'react-native-track-player';
-import { Track as AppTrack, SongMetadata } from '@/types';
+import { Track as AppTrack, SongMetadata } from '@/store/types';
 import { databaseService } from './DatabaseService';
 import { fileSystemService } from './FileSystemService';
 import { libraryProfilingService } from './LibraryProfilingService';

@@ -11,7 +11,7 @@ import Animated, {
 import TrackPlayer, { useProgress } from 'react-native-track-player';
 import { useTheme } from '@/context/ThemeContext';
 import { spacing, typography } from '@/constants/theme';
-import { ABRepeatState } from '@/types';
+import { ABRepeatState } from '@/store/types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const THUMB_SIZE = 16;
@@ -34,12 +34,12 @@ const formatTime = (seconds: number): string => {
 const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48, abRepeat, pointA }) => {
     const { colors } = useTheme();
     // Update progress every 250ms for a balance between smoothness and bridge traffic
-    const { position, duration } = useProgress(250); 
-    
+    const { position, duration } = useProgress(250);
+
     const isScrubbing = useSharedValue(false);
     const progressSv = useSharedValue(0); // 0 to 1
     const [displayTime, setDisplayTime] = useState('0:00');
-    
+
     // Sync shared value with player progress when not scrubbing
     useEffect(() => {
         if (!isScrubbing.value && duration > 0) {
@@ -121,7 +121,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48, ab
                                 ]}
                             />
                         )}
-                        
+
                         <Animated.View
                             style={[
                                 styles.progress,
@@ -143,7 +143,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48, ab
                             ]}
                         />
                     )}
-                    
+
                     {abRepeat?.isActive && duration > 0 && (
                         <>
                             <View
@@ -170,9 +170,9 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ width = SCREEN_WIDTH - 48, ab
                     <Animated.View
                         style={[
                             styles.thumb,
-                            { 
+                            {
                                 backgroundColor: colors.primary,
-                                shadowColor: colors.primary, 
+                                shadowColor: colors.primary,
                             },
                             animatedThumbStyle,
                         ]}

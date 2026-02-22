@@ -16,7 +16,7 @@ import {
     Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Track, Playlist } from '@/types';
+import { Track, Playlist } from '@/store/types';
 import { useTheme } from '@/context/ThemeContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { spacing, typography } from '@/constants/theme';

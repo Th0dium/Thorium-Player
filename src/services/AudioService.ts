@@ -7,7 +7,7 @@ import TrackPlayer, {
     Event,
     Track as TPTrack,
 } from 'react-native-track-player';
-import { Track, RepeatMode } from '@/types';
+import { Track, RepeatMode } from '@/store/types';
 
 class AudioService {
     private static instance: AudioService;

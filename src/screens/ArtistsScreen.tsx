@@ -13,7 +13,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useTheme } from '@/context/ThemeContext';
-import { Artist } from '@/types';
+import { Artist } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import AlphabetScroller from '@/components/AlphabetScroller';
 

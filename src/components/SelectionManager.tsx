@@ -14,7 +14,7 @@ import React, { useCallback } from 'react';
 import { View, FlatList, ViewStyle } from 'react-native';
 import { useUniversalSelection } from '@/hooks/useUniversalSelection';
 import SelectionToolbar from './SelectionToolbar';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 
 interface SelectionManagerProps {
     /** Tracks displayed in the list */

@@ -23,7 +23,7 @@ import { TrackActionsModal } from '@/components/TrackActionsModal';
 import EmptyState from '@/components/EmptyState';
 import SortMenu from '@/components/SortMenu';
 import { useSort } from '@/hooks/useSort';
-import { Track, SortOption } from '@/types';
+import { Track, SortOption } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 export type FilterType = 'all-songs' | 'favorites' | 'recently-added' | 'recently-played' | 'most-played' | 'not-played' | 'playlist' | 'album' | 'artist' | 'genre';

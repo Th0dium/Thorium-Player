@@ -13,7 +13,7 @@ import {
     SafeAreaView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 import { useTheme } from '@/context/ThemeContext';
 import { useQueueStore } from '@/store/queueStore';
 import { spacing, typography } from '@/constants/theme';

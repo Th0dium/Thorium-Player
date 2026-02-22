@@ -1,5 +1,5 @@
 // AI Playlist Service - Creates smart playlists using natural language and AI-generated tags
-import { Track, Playlist, AIPlaylistRequest, AIPlaylistResponse, AITag } from '@/types';
+import { Track, Playlist, AIPlaylistRequest, AIPlaylistResponse, AITag } from '@/store/types';
 import { databaseService } from './DatabaseService';
 import { aiTagService } from './AITagService';
 

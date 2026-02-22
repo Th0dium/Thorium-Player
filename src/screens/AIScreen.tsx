@@ -18,7 +18,7 @@ import { aiTagService } from '@/services/AITagService';
 import { aiPlaylistService } from '@/services/AIPlaylistService';
 import { useLibraryStore } from '@/store/libraryStore';
 import { databaseService } from '@/services/DatabaseService';
-import { Track, AITag } from '@/types';
+import { Track, AITag } from '@/store/types';
 import { colors, spacing, typography, borderRadius } from '@/constants/theme';
 
 type TabType = 'create' | 'tags' | 'settings';

@@ -1,7 +1,7 @@
 // Settings Store - UI preferences, navigation tabs, and app behavior settings
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SortOption } from '@/types';
+import { SortOption } from '@/store/types';
 
 const SETTINGS_STORAGE_KEY = '@thorium/ui_settings';
 let settingsPersistTimer: ReturnType<typeof setTimeout> | null = null;

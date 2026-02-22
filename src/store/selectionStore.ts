@@ -6,7 +6,7 @@
  */
 
 import { create } from 'zustand';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 
 interface SelectionStoreState {
     // Global selection state
@@ -23,7 +23,7 @@ interface SelectionStoreState {
     selectRange: (trackIds: string[]) => void;
     getSelectedTracks: (allTracks: Track[]) => Track[];
     getSelectedIds: () => string[];
-    
+
     // Get selection count
     readonly selectionCount: number;
 }

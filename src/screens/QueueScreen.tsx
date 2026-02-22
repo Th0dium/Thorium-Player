@@ -27,7 +27,7 @@ import TrackListItem from '@/components/TrackListItem';
 import SelectionToolbar from '@/components/SelectionToolbar';
 import { TrackActionsModal } from '@/components/TrackActionsModal';
 import SortMenu from '@/components/SortMenu';
-import { Track, Queue, SortOption } from '@/types';
+import { Track, Queue, SortOption } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

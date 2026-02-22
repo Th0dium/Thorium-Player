@@ -5,7 +5,7 @@
 // - LibraryProfilingService uses native MediaMetadata module directly
 // - This file can be deleted in a future cleanup
 //
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 import { Platform } from 'react-native';
 
 // Import MusicFiles dynamically to handle native module issues

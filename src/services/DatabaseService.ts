@@ -1,7 +1,7 @@
 // Database Service - Local storage for playlists, queues, settings, and track data
 // Implements extended song profiling as per DATA SYSTEM specification
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Track, Playlist, Queue, Settings, AITag, SongMetadata, PlaylistEntry, PlaybackState, ABRepeatState } from '@/types';
+import { Track, Playlist, Queue, Settings, AITag, SongMetadata, PlaylistEntry, PlaybackState, ABRepeatState } from '@/store/types';
 
 const STORAGE_KEYS = {
     TRACKS: '@thorium/tracks',

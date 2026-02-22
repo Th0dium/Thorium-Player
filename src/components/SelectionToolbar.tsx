@@ -18,7 +18,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
 import { useQueueStore } from '@/store/queueStore';
 import { AddToPlaylistModal } from './AddToPlaylistModal';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 import { spacing, typography } from '@/constants/theme';
 
 interface SelectionToolbarProps {

@@ -1,6 +1,6 @@
 // Library Store - State for music library, albums, artists, and search
 import { create } from 'zustand';
-import { Track, Album, Artist, Folder, Playlist, Genre } from '@/types';
+import { Track, Album, Artist, Folder, Playlist, Genre } from '@/store/types';
 import { databaseService } from '@/services/DatabaseService';
 import { fileSystemService } from '@/services/FileSystemService';
 import { libraryProfilingService } from '@/services/LibraryProfilingService';

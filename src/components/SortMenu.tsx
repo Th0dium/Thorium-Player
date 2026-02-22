@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
-import { SortOption } from '@/types';
+import { SortOption } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -72,10 +72,10 @@ export const SortMenu: React.FC<SortMenuProps> = ({
             <TouchableWithoutFeedback onPress={onClose}>
                 <View style={styles.modalOverlay}>
                     <TouchableWithoutFeedback>
-                        <View 
+                        <View
                             style={[
-                                styles.menuContainer, 
-                                { 
+                                styles.menuContainer,
+                                {
                                     backgroundColor: colors.surfaceElevated,
                                     paddingBottom: Math.max(spacing.md, insets.bottom)
                                 }
@@ -95,10 +95,10 @@ export const SortMenu: React.FC<SortMenuProps> = ({
                                         ]}
                                         onPress={() => handleOptionPress(optionKey)}
                                     >
-                                        <Icon 
-                                            name={meta.icon} 
-                                            size={20} 
-                                            color={isActive ? colors.primary : colors.textSecondary} 
+                                        <Icon
+                                            name={meta.icon}
+                                            size={20}
+                                            color={isActive ? colors.primary : colors.textSecondary}
                                         />
                                         <Text style={[
                                             styles.sortOptionLabel,
@@ -107,10 +107,10 @@ export const SortMenu: React.FC<SortMenuProps> = ({
                                             {meta.label}
                                         </Text>
                                         {isActive && (
-                                            <Icon 
-                                                name={sortAsc ? 'arrow-up' : 'arrow-down'} 
-                                                size={18} 
-                                                color={colors.primary} 
+                                            <Icon
+                                                name={sortAsc ? 'arrow-up' : 'arrow-down'}
+                                                size={18}
+                                                color={colors.primary}
                                                 style={{ marginLeft: 'auto' }}
                                             />
                                         )}

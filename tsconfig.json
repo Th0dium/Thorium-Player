@@ -22,7 +22,7 @@
         "./src/utils/*"
       ],
       "@types/*": [
-        "./src/types/*"
+        "src/store/types/*"
       ],
       "@constants/*": [
         "./src/constants/*"

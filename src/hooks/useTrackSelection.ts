@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 
 export interface TrackSelectionState {
     /** Currently selected track IDs */

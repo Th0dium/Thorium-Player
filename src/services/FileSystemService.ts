@@ -1,6 +1,6 @@
 // File System Service - Scans device for audio files and manages file operations
 import RNFS from 'react-native-fs';
-import { Track, Folder } from '@/types';
+import { Track, Folder } from '@/store/types';
 import { Platform } from 'react-native';
 
 // Supported audio formats

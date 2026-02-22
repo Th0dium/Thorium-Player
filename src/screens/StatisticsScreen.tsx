@@ -15,7 +15,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { databaseService } from '@/services/DatabaseService';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

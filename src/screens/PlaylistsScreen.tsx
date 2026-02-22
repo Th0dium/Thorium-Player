@@ -17,7 +17,7 @@ import EmptyState from '@/components/EmptyState';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useQueueStore } from '@/store/queueStore';
 import { useTheme } from '@/context/ThemeContext';
-import { Playlist } from '@/types';
+import { Playlist } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 
 interface PlaylistsScreenProps {

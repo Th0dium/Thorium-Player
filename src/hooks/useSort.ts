@@ -1,9 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Track, SortOption } from '@/types';
+import { Track, SortOption } from '@/store/types';
 import { useSettingsStore } from '@/store/settingsStore';
 
 export const useSort = (
-    initialSortBy: SortOption = 'title', 
+    initialSortBy: SortOption = 'title',
     initialSortAsc: boolean = true,
     viewId?: string
 ) => {
@@ -46,7 +46,7 @@ export const useSort = (
     const handleSortChange = (option: SortOption, asc: boolean) => {
         setSortBy(option);
         setSortAsc(asc);
-        
+
         if (viewId) {
             useSettingsStore.getState().setSortConfig(viewId, option, asc);
         }

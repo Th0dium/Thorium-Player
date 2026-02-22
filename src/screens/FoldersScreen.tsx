@@ -16,7 +16,7 @@ import { useQueueStore } from '@/store/queueStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { useTheme } from '@/context/ThemeContext';
 import { useUniversalSelection } from '@/hooks/useUniversalSelection';
-import { Folder, Track } from '@/types';
+import { Folder, Track } from '@/store/types';
 import { spacing, typography, borderRadius } from '@/constants/theme';
 import TrackListItem from '@/components/TrackListItem';
 import SelectionToolbar from '@/components/SelectionToolbar';

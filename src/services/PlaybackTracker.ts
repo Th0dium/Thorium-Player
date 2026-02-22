@@ -2,7 +2,7 @@
 // Implements: Play count at 90% completion or 30+ seconds listened
 import TrackPlayer, { Event, State, Progress } from 'react-native-track-player';
 import { databaseService } from './DatabaseService';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 
 const PLAY_COUNT_PERCENTAGE = 0.9; // 90% of track duration
 const PLAY_COUNT_MIN_SECONDS = 30; // Minimum 30 seconds for short tracks

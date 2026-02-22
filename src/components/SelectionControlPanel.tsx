@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useTheme } from '@/context/ThemeContext';
-import { Track } from '@/types';
+import { Track } from '@/store/types';
 import { spacing, typography } from '@/constants/theme';
 
 interface SelectionControlPanelProps {
