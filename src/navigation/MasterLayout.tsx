@@ -102,7 +102,6 @@ const MasterLayout: React.FC = () => {
                 setActiveTab(newTabId);
                 setSearchQuery('');
                 setIsSearchVisible(false);
-                // WE NO LONGER CLEAR librarySubScreen HERE TO PRESERVE STATE
             }
         }
     };
